@@ -10,6 +10,7 @@ type RunRow = {
   cleared_count: number; // 1 = win, 0 = lose
   duration_sec: number;
   mode: string;
+  soup_id: string | null;
 };
 
 export default function MyRunsPage() {
@@ -24,7 +25,7 @@ export default function MyRunsPage() {
 
       const { data: list, error } = await supabase
         .from("runs")
-        .select("id, ended_at, cleared_count, duration_sec, mode")
+        .select("id, ended_at, cleared_count, duration_sec, mode, soup_id")
         .order("ended_at", { ascending: false })
         .limit(50);
 
@@ -36,7 +37,7 @@ export default function MyRunsPage() {
   }, [router]);
 
   return (
-    <div style={{ maxWidth: 720, margin: "40px auto", padding: 16 }}>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
       <h1>My Runs</h1>
       <button onClick={() => router.push("/")}>Back</button>
 
@@ -50,6 +51,7 @@ export default function MyRunsPage() {
             <th align="left">Result</th>
             <th align="right">Time(s)</th>
             <th align="left">Mode</th>
+            <th align="left">Soup ID</th>
           </tr>
         </thead>
         <tbody>
@@ -60,6 +62,7 @@ export default function MyRunsPage() {
               <td>{r.cleared_count > 0 ? "WIN" : "LOSE"}</td>
               <td align="right">{r.duration_sec ?? 0}</td>
               <td>{r.mode}</td>
+              <td>{r.soup_id ?? "(null)"}</td>
             </tr>
           ))}
         </tbody>

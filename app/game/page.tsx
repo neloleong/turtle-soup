@@ -44,7 +44,7 @@ export default function GamePage() {
   const [soupsLoaded, setSoupsLoaded] = useState(false);
   const [soupIndex, setSoupIndex] = useState(0);
 
-  // 遊戲狀態（✅ 不再計 wrong）
+  // 遊戲狀態（✅ 不計 wrong，只記 win/lose + time）
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>("");
   const [input, setInput] = useState("");
@@ -163,8 +163,9 @@ export default function GamePage() {
 
     setTip("");
 
-    // ✅ 只記錄過關/不過關：wrong 永遠傳 0
+    // ✅ 新版 finish_run 要傳 p_soup_id
     const { data, error } = await supabase.rpc("finish_run", {
+      p_soup_id: soup.id,
       p_cleared_count: win ? 1 : 0,
       p_wrong_count: 0,
       p_duration_sec: durationSec,
@@ -185,7 +186,7 @@ export default function GamePage() {
         text:
           (win ? "🎉 通關！" : "⛔ 已結束（未通關）") +
           `\n用時：${durationSec}s` +
-          `\n（runs 已寫入：id=${data?.id ?? "?"}）`,
+          `\n（runs 已寫入：id=${data?.id ?? "?"} / soup_id=${soup.id}）`,
         at: Date.now(),
       },
       {
@@ -299,7 +300,7 @@ export default function GamePage() {
         <strong>題目：</strong>
         <span>{soup.title}</span>
         <span style={{ fontSize: 12, opacity: 0.75 }}>
-          started: {startedAt ? "yes" : "no"} / ended: {ended ? "yes" : "no"}
+          started: {startedAt ? "yes" : "no"} / ended: {ended ? "yes" : "no"} / soup_id: {soup.id}
         </span>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
