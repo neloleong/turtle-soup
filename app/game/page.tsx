@@ -1,15 +1,15 @@
-// /app/game/page.tsx 
+// /app/game/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
 type Soup = {
   id: string;
   title: string;
-  story: string;
-  answer?: string;
+  surface: string;
+  solution: string;
   winKeywords: string[];
 };
 
@@ -29,7 +29,6 @@ function fmtSec(sec: number) {
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
-// MVP 回覆（之後你想再智能化先再加）
 function simpleJudge(input: string) {
   const s = input.trim().toLowerCase();
   if (!s) return "你打咗空白喎，寫句問題先啦。";
@@ -46,18 +45,11 @@ export default function GamePage() {
   const [soup, setSoup] = useState<Soup | null>(null);
 
   const [startAt, setStartAt] = useState<number>(Date.now());
-  const [tick, setTick] = useState(0);
-
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const mode = "mvp";
-
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 500);
-    return () => clearInterval(t);
-  }, []);
+  const mode = "standard";
 
   useEffect(() => {
     (async () => {
@@ -87,7 +79,7 @@ export default function GamePage() {
         },
         ...(pick
           ? [
-              { role: "sys" as const, text: `湯面：${pick.story}`, at: Date.now() },
+              { role: "sys" as const, text: `湯面：${pick.surface}`, at: Date.now() },
               {
                 role: "sys" as const,
                 text: "✅ 通關條件：你句說話只要撞中任何「通關關鍵詞」就算過關。",
@@ -106,7 +98,7 @@ export default function GamePage() {
   function containsWin(text: string) {
     if (!soup) return false;
     const t = text.toLowerCase();
-    return soup.winKeywords.some((k) => t.includes(String(k).toLowerCase()));
+    return (soup.winKeywords ?? []).some((k) => t.includes(String(k).toLowerCase()));
   }
 
   async function finish(win: boolean) {
@@ -116,12 +108,13 @@ export default function GamePage() {
     try {
       const duration = nowSec(startAt);
 
-      const { error } = await supabase.rpc("finish_run", {
-        p_win: win,
-        p_wrong: 0,
+      // ✅ 對齊你原本 DB 的 finish_run 版本（p_cleared_count / p_wrong_count）
+      const { data, error } = await supabase.rpc("finish_run", {
+        p_soup_id: soup.id,
+        p_cleared_count: win ? 1 : 0,
+        p_wrong_count: 0,
         p_duration_sec: duration,
         p_mode: mode,
-        p_soup_id: soup.id,
       });
 
       if (error) throw error;
@@ -135,15 +128,20 @@ export default function GamePage() {
             : `🧾 完場（未通關）。已記錄～ 用時：${fmtSec(duration)}`,
           at: Date.now(),
         },
+        ...(win
+          ? []
+          : [
+              {
+                role: "sys" as const,
+                text: `（系統：runs 已寫入 id=${data?.id ?? "?"} / soup_id=${soup.id}）`,
+                at: Date.now() + 1,
+              },
+            ]),
       ]);
     } catch (e: any) {
       setMsgs((m) => [
         ...m,
-        {
-          role: "sys",
-          text: `❌ 寫入失敗：${e?.message ?? "Unknown error"}`,
-          at: Date.now(),
-        },
+        { role: "sys", text: `❌ 寫入失敗：${e?.message ?? "Unknown error"}`, at: Date.now() },
       ]);
     } finally {
       setBusy(false);
@@ -158,10 +156,7 @@ export default function GamePage() {
     setMsgs((m) => [...m, { role: "me", text, at: Date.now() }]);
 
     if (containsWin(text)) {
-      setMsgs((m) => [
-        ...m,
-        { role: "sys", text: "🎯 撞中通關關鍵詞！", at: Date.now() },
-      ]);
+      setMsgs((m) => [...m, { role: "sys", text: "🎯 撞中通關關鍵詞！", at: Date.now() }]);
       await finish(true);
       return;
     }
@@ -183,7 +178,7 @@ export default function GamePage() {
     setInput("");
     setMsgs([
       { role: "sys", text: `🧩 新一局：「${pick.title}」`, at: Date.now() },
-      { role: "sys", text: `湯面：${pick.story}`, at: Date.now() },
+      { role: "sys", text: `湯面：${pick.surface}`, at: Date.now() },
       { role: "sys", text: "想放棄都得，唔使硬撐～", at: Date.now() },
     ]);
   }
