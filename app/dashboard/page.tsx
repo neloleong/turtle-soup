@@ -55,8 +55,16 @@ export default function DashboardPage() {
       if (profErr) {
         setErr(profErr.message);
       } else {
-        setDisplayName((prof?.display_name ?? "").trim());
-      }
+        const dn = (prof?.display_name ?? "").trim();
+        setDisplayName(dn);
+
+        if (!dn) {
+            router.push("/profile");   // ✅ 強制去改名
+            return;
+            }
+            }
+
+      
 
       // 2) Player stats（cleared_count）
       const { data: st, error: stErr } = await supabase
