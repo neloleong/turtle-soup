@@ -17,13 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Script
-          id="adsense-loader"
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2071278885677120"
-          crossOrigin="anonymous"
-          strategy="beforeInteractive"
-        />
+        
 
         <NavBar />
         <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
