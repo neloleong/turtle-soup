@@ -11,7 +11,7 @@ type Soup = {
   surface: string;
   solution: string;
   winKeywords: string[];
-  // optional future:
+  // 之後你想題庫真係帶 difficulty，可以加：
   // difficulty?: "簡單" | "普通" | "困難";
 };
 
@@ -51,9 +51,12 @@ export default function GamePage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
 
-  // ✅ 你想 mode 變「困難度」顯示；暫時先固定「普通」
+  // ✅ 你要顯示「困難度」：暫時固定
   const difficulty = "普通";
+  // 如果你之後題庫有 difficulty，就改成：
+  // const difficulty = soup?.difficulty ?? "普通";
 
+  // ✅ 初始化：登入 + 讀 soups.json + 開一局
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -67,24 +70,24 @@ export default function GamePage() {
       setSoups(json);
 
       const pick = json[Math.floor(Math.random() * Math.max(1, json.length))] ?? null;
-
       setSoup(pick);
       setStartAt(Date.now());
 
+      // ✅ 對答區：唔再塞「湯面」
       setMsgs([
         {
           role: "sys",
-          text: pick ? `🧩 新一局：「${pick.title}」` : "❌ 題庫冇料喎，睇下 /public/soups.json 得唔得。",
+          text: pick
+            ? `🧩 新一局：「${pick.title}」`
+            : "❌ 題庫冇料喎，睇下 /public/soups.json 得唔得。",
           at: Date.now(),
         },
-        ...(pick
-          ? [{ role: "sys" as const, text: `湯面：${pick.surface}`, at: Date.now() }]
-          : []),
         { role: "sys", text: "想放棄都得，唔使硬撐～", at: Date.now() },
       ]);
     })();
   }, [router]);
 
+  // ✅ 自動捲到底
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [msgs]);
@@ -102,7 +105,7 @@ export default function GamePage() {
     try {
       const duration = nowSec(startAt);
 
-      // ✅ 仍然用你現有 DB 的 finish_run（cleared_count 版本）
+      // ✅ 對齊你 DB 的 finish_run（cleared_count 版本）
       const { error } = await supabase.rpc("finish_run", {
         p_soup_id: soup.id,
         p_cleared_count: win ? 1 : 0,
@@ -140,12 +143,14 @@ export default function GamePage() {
     setInput("");
     setMsgs((m) => [...m, { role: "me", text, at: Date.now() }]);
 
+    // ✅ 通關
     if (containsWin(text)) {
       setMsgs((m) => [...m, { role: "sys", text: "🎯 撞中通關關鍵詞！", at: Date.now() }]);
       await finish(true);
       return;
     }
 
+    // ✅ 未通關：回一句
     setBusy(true);
     try {
       const reply = simpleJudge(text);
@@ -161,23 +166,33 @@ export default function GamePage() {
     setSoup(pick);
     setStartAt(Date.now());
     setInput("");
+
+    // ✅ 對答區：唔再塞「湯面」
     setMsgs([
       { role: "sys", text: `🧩 新一局：「${pick.title}」`, at: Date.now() },
-      { role: "sys", text: `湯面：${pick.surface}`, at: Date.now() },
       { role: "sys", text: "想放棄都得，唔使硬撐～", at: Date.now() },
     ]);
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {/* 左：主卡（你要求：上面資訊欄 + 下面對答） */}
+      {/* 左：主卡（上面資訊欄 + 下面對答） */}
       <div className="md:col-span-2 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
-        {/* ✅ 新增：湯名 / 困難度 / 用時（獨立一格） */}
+        {/* ✅ 上面一格：湯名 + 湯面 + 困難度 + 用時 */}
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs text-white/55">湯名</div>
-              <div className="text-lg font-semibold text-white">{soup?.title ?? "（載入中…）"}</div>
+              <div className="text-lg font-semibold text-white">
+                {soup?.title ?? "（載入中…）"}
+              </div>
+
+              <div className="mt-2">
+                <div className="text-xs text-white/55">湯面</div>
+                <div className="text-sm text-white/85 whitespace-pre-wrap leading-relaxed">
+                  {soup?.surface ?? "（載入中…）"}
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -208,7 +223,7 @@ export default function GamePage() {
           </div>
         </div>
 
-        {/* ✅ 下面一格：對答（你要嘅對話區） */}
+        {/* ✅ 下面一格：對答 */}
         <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
           <div className="mb-2 text-xs text-white/55">對答</div>
 
