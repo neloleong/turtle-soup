@@ -1,123 +1,84 @@
 // /app/profile/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const router = useRouter();
-  
-
-  const [loading, setLoading] = useState(true);
-  const [uid, setUid] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-
-  const [displayName, setDisplayName] = useState("");
+  const [name, setName] = useState("");
   const [msg, setMsg] = useState("");
-  const [isErr, setIsErr] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-      setUid(user.id);
-      setEmail(user.email ?? null);
+      if (!data.user) return router.push("/login");
 
-      const { data: prof, error } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("display_name")
-        .eq("id", user.id)
+        .eq("id", data.user.id)
         .maybeSingle();
 
-      if (!error && prof?.display_name) setDisplayName(prof.display_name);
-
-      setLoading(false);
+      if ((profile?.display_name ?? "").trim()) router.push("/leaderboard");
     })();
-  }, [router, supabase]);
+  }, [router]);
 
-  async function save() {
+  const save = async () => {
     setMsg("");
-    setIsErr(false);
+    const v = name.trim();
+    if (v.length < 2) return setMsg("個名太短啦（最少 2 個字）。");
+    if (v.length > 20) return setMsg("個名太長啦（最多 20 個字）。");
 
-    if (!uid) return;
-
-    const name = displayName.trim();
-    if (!name) {
-      setIsErr(true);
-      setMsg("Display name cannot be empty.");
-      return;
+    setLoading(true);
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) {
+      setLoading(false);
+      return router.push("/login");
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({ id: uid, display_name: name });
+    const { error } = await supabase.from("profiles").update({ display_name: v }).eq("id", uid);
+    setLoading(false);
 
-    if (error) {
-      setIsErr(true);
-      setMsg(error.message);
-      return;
-    }
+    if (error) return setMsg("保存失敗： " + error.message);
 
-    setIsErr(false);
-    setMsg("Saved.");
+    router.push("/leaderboard");
     router.refresh();
-  }
+  };
 
   return (
-    <>
-      <div className="hero">
-        <h1 className="h1">Profile</h1>
-        <div className="sub">Set a display name for leaderboard and runs.</div>
+    <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <h1 className="text-2xl font-semibold text-white">改名</h1>
+      <p className="text-sm text-white/70">你個名會喺排行榜出現～</p>
+
+      <input
+        className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-white outline-none focus:ring-4 focus:ring-white/10"
+        placeholder="例如：EmitTong"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      <div className="flex gap-2">
+        <button
+          onClick={save}
+          disabled={loading}
+          className="rounded-xl bg-white px-4 py-2 font-medium text-slate-900 disabled:opacity-40 transition"
+        >
+          {loading ? "保存緊…" : "保存"}
+        </button>
+        <button
+          onClick={() => router.push("/game")}
+          disabled={loading}
+          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 hover:bg-white/10 disabled:opacity-40 transition"
+        >
+          唔改住，返去玩
+        </button>
       </div>
 
-      <div className="card">
-        <div className="cardPad">
-          <div className="cardHeader">
-            <div className="cardTitle">
-              <strong>Display Name</strong>
-              <span className="mono">{email ?? ""}</span>
-            </div>
-            <span className="badge">
-              <span className={`dot ${loading ? "dotWarn" : "dotGood"}`} />
-              {loading ? "Loading" : "Ready"}
-            </span>
-          </div>
-
-          <div className="formRow">
-            <div className="label">Name</div>
-            <input
-              className="input"
-              placeholder="e.g. Derek"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </div>
-
-          <div className="btnRow">
-            <button className="btn btnPrimary" onClick={save} disabled={loading}>
-              Save
-            </button>
-            <button
-              className="btn btnSecondary"
-              onClick={() => router.push("/leaderboard")}
-              disabled={loading}
-            >
-              Go to Leaderboard
-            </button>
-          </div>
-
-          {msg ? (
-            <div className={`toast ${isErr ? "toastBad" : "toastGood"}`} style={{ marginTop: 12 }}>
-              {msg}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </>
+      {msg ? <p className="text-sm text-white/70">{msg}</p> : null}
+    </div>
   );
 }

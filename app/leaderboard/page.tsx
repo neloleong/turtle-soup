@@ -2,98 +2,81 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
 type Row = {
-  id: string;
+  user_id: string;
   display_name: string | null;
   cleared_count: number;
 };
 
 export default function LeaderboardPage() {
-  
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return router.push("/login");
 
-      // Join player_stats -> profiles
-      const { data, error } = await supabase
+      const { data: list, error } = await supabase
         .from("player_stats")
-        .select("id, cleared_count, profiles(display_name)")
+        .select("user_id, cleared_count, profiles(display_name)")
         .order("cleared_count", { ascending: false })
         .limit(50);
 
-      if (!error && data) {
-        const mapped: Row[] = data.map((r: any) => ({
-          id: r.id,
-          cleared_count: r.cleared_count ?? 0,
-          display_name: r.profiles?.display_name ?? null,
-        }));
-        setRows(mapped);
-      }
+      if (error) return setErr(error.message);
 
-      setLoading(false);
+      const mapped: Row[] = (list ?? []).map((r: any) => ({
+        user_id: r.user_id,
+        cleared_count: r.cleared_count ?? 0,
+        display_name: r.profiles?.display_name ?? null,
+      }));
+
+      setRows(mapped);
     })();
-  }, [supabase]);
+  }, [router]);
 
   return (
-    <>
-      <div className="hero">
-        <h1 className="h1">Leaderboard</h1>
-        <div className="sub">
-          Ranked by <b>cleared_count</b>. Keep solving.
-        </div>
+    <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-white">排行榜</h1>
+        <button
+          onClick={() => router.push("/game")}
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 hover:bg-white/10 transition"
+        >
+          返去開局
+        </button>
       </div>
 
-      <div className="card">
-        <div className="cardPad">
-          <div className="cardHeader">
-            <div className="cardTitle">
-              <strong>Top Players</strong>
-              <span>{loading ? "Loading…" : `Showing ${rows.length} players`}</span>
-            </div>
-            <span className="badge">
-              <span className={`dot ${loading ? "dotWarn" : "dotGood"}`} />
-              {loading ? "Fetching" : "Live"}
-            </span>
-          </div>
+      {err ? <p className="text-sm text-rose-200">{err}</p> : null}
 
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>Rank</th>
-                <th>Name</th>
-                <th className="tRight" style={{ width: 140 }}>
-                  Cleared
-                </th>
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        <table className="w-full border-collapse">
+          <thead className="bg-white/5">
+            <tr className="text-left text-xs text-white/60">
+              <th className="px-3 py-2 w-16">名次</th>
+              <th className="px-3 py-2">玩家</th>
+              <th className="px-3 py-2 text-right w-28">通關</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.user_id} className="border-t border-white/5 hover:bg-white/5">
+                <td className="px-3 py-2 text-white/70">{i + 1}</td>
+                <td className="px-3 py-2 text-white">
+                  {r.display_name ?? <span className="text-white/50">(未改名)</span>}
+                </td>
+                <td className="px-3 py-2 text-right text-white/70">{r.cleared_count}</td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, idx) => (
-                <tr key={r.id}>
-                  <td className="mono">#{idx + 1}</td>
-                  <td>{r.display_name || <span className="mono">(no name)</span>}</td>
-                  <td className="tRight mono">{r.cleared_count}</td>
-                </tr>
-              ))}
-              {!loading && rows.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="mono">
-                    No data yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-
-          <div className="small" style={{ marginTop: 10 }}>
-            Tip: set your name in <b>Profile</b> so you won’t show as “(no name)”.
-          </div>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </>
+
+      <p className="text-xs text-white/55">提示：想上榜，就快啲通關啦～</p>
+    </div>
   );
 }

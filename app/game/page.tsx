@@ -29,18 +29,17 @@ function fmtSec(sec: number) {
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
+// MVP 回覆（之後你想再智能化先再加）
 function simpleJudge(input: string) {
-  // 你而家 MVP：簡單回覆（可後續再做更智能）
   const s = input.trim().toLowerCase();
-  if (!s) return "Please type a question.";
-  if (s.includes("?") || s.includes("？")) return "Maybe.";
-  if (s.includes("is it") || s.includes("係唔係")) return "Yes/No/Not related.";
-  return "Not sure — ask as a Yes/No question.";
+  if (!s) return "你打咗空白喎，寫句問題先啦。";
+  if (s.includes("?") || s.includes("？")) return "嗯…有可能。再問準啲？";
+  if (s.includes("係唔係") || s.includes("is it")) return "可以用「是/否」咁問，會快啲。";
+  return "唔太肯定…試下用 Yes/No 問法。";
 }
 
 export default function GamePage() {
   const router = useRouter();
-  
   const chatRef = useRef<HTMLDivElement | null>(null);
 
   const [soups, setSoups] = useState<Soup[]>([]);
@@ -53,7 +52,7 @@ export default function GamePage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const mode = "mvp"; // 如你之後有多模式，可以擴展
+  const mode = "mvp";
 
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 500);
@@ -72,36 +71,36 @@ export default function GamePage() {
       const json = (await res.json()) as Soup[];
       setSoups(json);
 
-      const pick = json[Math.floor(Math.random() * Math.max(1, json.length))] ?? null;
+      const pick =
+        json[Math.floor(Math.random() * Math.max(1, json.length))] ?? null;
+
       setSoup(pick);
       setStartAt(Date.now());
+
       setMsgs([
         {
           role: "sys",
           text: pick
-            ? `🧩 Mystery loaded: "${pick.title}". Ask Yes/No questions to solve it.`
-            : "No soups found. Please check /public/soups.json",
+            ? `🧩 題目入咗場：「${pick.title}」。用 Yes/No 問法推理最快。`
+            : "❌ 題庫冇料喎，睇下 /public/soups.json 得唔得。",
           at: Date.now(),
         },
         ...(pick
           ? [
-              { role: "sys" as const, text: pick.story, at: Date.now() },
+              { role: "sys" as const, text: `湯面：${pick.story}`, at: Date.now() },
               {
                 role: "sys" as const,
-                text: "Win condition: your message contains any win keyword.",
+                text: "✅ 通關條件：你句說話只要撞中任何「通關關鍵詞」就算過關。",
                 at: Date.now(),
               },
             ]
           : []),
       ]);
     })();
-  }, [router, supabase]);
+  }, [router]);
 
   useEffect(() => {
-    // auto scroll to bottom
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [msgs]);
 
   function containsWin(text: string) {
@@ -117,7 +116,6 @@ export default function GamePage() {
     try {
       const duration = nowSec(startAt);
 
-      // ✅ RPC: finish_run(p_win, p_wrong, p_duration_sec, p_mode, p_soup_id)
       const { error } = await supabase.rpc("finish_run", {
         p_win: win,
         p_wrong: 0,
@@ -133,15 +131,19 @@ export default function GamePage() {
         {
           role: "sys",
           text: win
-            ? `✅ Cleared! Saved to your stats. Time: ${fmtSec(duration)}`
-            : `🧾 Finished (not cleared). Saved. Time: ${fmtSec(duration)}`,
+            ? `🎉 通關啦！已記錄～ 用時：${fmtSec(duration)}`
+            : `🧾 完場（未通關）。已記錄～ 用時：${fmtSec(duration)}`,
           at: Date.now(),
         },
       ]);
     } catch (e: any) {
       setMsgs((m) => [
         ...m,
-        { role: "sys", text: `❌ Save failed: ${e?.message ?? "Unknown error"}`, at: Date.now() },
+        {
+          role: "sys",
+          text: `❌ 寫入失敗：${e?.message ?? "Unknown error"}`,
+          at: Date.now(),
+        },
       ]);
     } finally {
       setBusy(false);
@@ -155,11 +157,10 @@ export default function GamePage() {
     setInput("");
     setMsgs((m) => [...m, { role: "me", text, at: Date.now() }]);
 
-    // win check
     if (containsWin(text)) {
       setMsgs((m) => [
         ...m,
-        { role: "sys", text: "🎯 Win keyword detected.", at: Date.now() },
+        { role: "sys", text: "🎯 撞中通關關鍵詞！", at: Date.now() },
       ]);
       await finish(true);
       return;
@@ -167,7 +168,6 @@ export default function GamePage() {
 
     setBusy(true);
     try {
-      // MVP reply
       const reply = simpleJudge(text);
       setMsgs((m) => [...m, { role: "sys", text: reply, at: Date.now() }]);
     } finally {
@@ -182,113 +182,110 @@ export default function GamePage() {
     setStartAt(Date.now());
     setInput("");
     setMsgs([
-      { role: "sys", text: `🧩 New mystery: "${pick.title}"`, at: Date.now() },
-      { role: "sys", text: pick.story, at: Date.now() },
-      { role: "sys", text: "Ask Yes/No questions. Or give up anytime.", at: Date.now() },
+      { role: "sys", text: `🧩 新一局：「${pick.title}」`, at: Date.now() },
+      { role: "sys", text: `湯面：${pick.story}`, at: Date.now() },
+      { role: "sys", text: "想放棄都得，唔使硬撐～", at: Date.now() },
     ]);
   }
 
   return (
-    <>
-      <div className="hero">
-        <h1 className="h1">Game</h1>
-        <div className="sub">
-          Ask. Narrow down. Trigger a win keyword to clear.
-        </div>
-      </div>
-
-      <div className="grid2">
-        <div className="card">
-          <div className="cardPad">
-            <div className="cardHeader">
-              <div className="cardTitle">
-                <strong>{soup ? soup.title : "Loading…"}</strong>
-                <span className="mono">
-                  soup_id: {soup?.id ?? "-"} · mode: {mode} · time:{" "}
-                  {fmtSec(nowSec(startAt))}
-                </span>
-              </div>
-
-              <div className="btnRow">
-                <button className="btn btnSecondary" onClick={newGame} disabled={!soups.length || busy}>
-                  New
-                </button>
-                <button className="btn btnDanger" onClick={() => finish(false)} disabled={!soup || busy}>
-                  Give up
-                </button>
-              </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="md:col-span-2 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">開局</h1>
+            <div className="text-xs text-white/55">
+              題目ID：{soup?.id ?? "-"} · 模式：{mode} · 用時：{fmtSec(nowSec(startAt))}
             </div>
+          </div>
 
-            <div ref={chatRef} className="chat">
-              {msgs.map((m, idx) => (
-                <div key={idx} className={`bubbleRow ${m.role === "me" ? "me" : "sys"}`}>
-                  <div className="bubble">
-                    <div>{m.text}</div>
-                    <div className="bubbleMeta">
-                      <span className="mono">{m.role === "me" ? "You" : "System"}</span>
-                      <span className="mono">
-                        {new Date(m.at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="footerBar">
-              <input
-                className="input"
-                placeholder={busy ? "Thinking…" : "Type a question… (Enter to send)"}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") send();
-                }}
-                disabled={!soup || busy}
-              />
-              <button className="btn btnPrimary" onClick={send} disabled={!soup || busy}>
-                Send
-              </button>
-            </div>
-
-            <div className="small" style={{ marginTop: 10 }}>
-              ✅ Your run will be saved via <span className="mono">finish_run</span> with{" "}
-              <span className="mono">soup_id</span>.
-            </div>
+          <div className="flex gap-2">
+            <button
+              className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 hover:bg-white/10 transition disabled:opacity-40"
+              onClick={newGame}
+              disabled={!soups.length || busy}
+            >
+              新題
+            </button>
+            <button
+              className="rounded-xl border border-rose-300/30 bg-rose-300/10 px-3 py-2 text-rose-100 hover:bg-rose-300/15 transition disabled:opacity-40"
+              onClick={() => finish(false)}
+              disabled={!soup || busy}
+            >
+              放棄
+            </button>
           </div>
         </div>
 
-        <div className="card">
-          <div className="cardPad">
-            <div className="cardTitle">
-              <strong>How to clear</strong>
-              <span>Trigger any win keyword.</span>
+        <div
+          ref={chatRef}
+          className="max-h-[520px] min-h-[360px] overflow-auto pr-1 flex flex-col gap-2"
+        >
+          {msgs.map((m, idx) => (
+            <div
+              key={idx}
+              className={[
+                "max-w-[78%] whitespace-pre-wrap rounded-2xl border p-3 text-sm",
+                m.role === "me"
+                  ? "self-end border-white/10 bg-white text-slate-900"
+                  : "self-start border-white/10 bg-black/20 text-white",
+              ].join(" ")}
+            >
+              <div className="mb-1 flex items-center justify-between gap-3 text-xs opacity-70">
+                <span>{m.role === "me" ? "你" : "系統"}</span>
+                <span>{new Date(m.at).toLocaleTimeString()}</span>
+              </div>
+              {m.text}
             </div>
-            <div className="hr" />
-            {soup ? (
-              <>
-                <div className="small">
-                  Win keywords:
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {soup.winKeywords.map((k, i) => (
-                      <span key={i} className="badge">
-                        <span className="dot dotGood" />
-                        <span className="mono">{k}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="hr" />
-                <div className="small">
-                  Tip: keep questions short and binary (Yes/No).
-                </div>
-              </>
-            ) : (
-              <div className="small">Loading soup…</div>
-            )}
-          </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-white outline-none focus:ring-4 focus:ring-white/10 disabled:opacity-40"
+            placeholder={busy ? "諗緊…" : "打句問題…（Enter 送出）"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            disabled={!soup || busy}
+          />
+          <button
+            className="rounded-xl bg-white px-4 py-2 font-medium text-slate-900 disabled:opacity-40 transition"
+            onClick={send}
+            disabled={!soup || busy}
+          >
+            送出
+          </button>
+        </div>
+
+        <div className="text-xs text-white/55">
+          ✅ 呢局完場會用 <span className="font-mono">finish_run</span> 寫入紀錄（包含 soup_id）。
         </div>
       </div>
-    </>
+
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div>
+          <h2 className="text-lg font-semibold text-white">點先算通關？</h2>
+          <p className="text-sm text-white/70 mt-1">
+            你句說話只要撞中以下任何「通關關鍵詞」就得。
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(soup?.winKeywords ?? []).map((k, i) => (
+            <span
+              key={i}
+              className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100"
+            >
+              {k}
+            </span>
+          ))}
+        </div>
+
+        <p className="text-xs text-white/55">
+          小貼士：問題越短越好，用「係唔係」問法推理最快～
+        </p>
+      </div>
+    </div>
   );
 }

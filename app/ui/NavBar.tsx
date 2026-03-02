@@ -55,16 +55,16 @@ export default function NavBar() {
           <div className="leading-tight">
             <div className="text-sm font-semibold text-white">海龜湯</div>
             <div className="text-xs text-white/55">
-              {email ? `已登入：${email}` : "未登入"}
+              {email ? `你已登入：${email}` : "未登入"}
             </div>
           </div>
         </div>
 
         <nav className="flex flex-wrap items-center gap-2">
-          {pill("/game", "遊戲")}
+          {pill("/game", "開局")}
           {pill("/leaderboard", "排行榜")}
-          {pill("/me/runs", "我的紀錄")}
-          {pill("/profile", "個人資料")}
+          {pill("/me/runs", "我嘅紀錄")}
+          {pill("/profile", "改名")}
           {email ? (
             <button
               onClick={logout}

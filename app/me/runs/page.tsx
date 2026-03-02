@@ -1,16 +1,16 @@
 // /app/me/runs/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 
 type RunRow = {
-  id: string;
-  created_at: string;
-  win: boolean;
+  id: number;
+  ended_at: string;
+  cleared_count: number; // 1=win,0=lose
   duration_sec: number;
-  mode: string | null;
+  mode: string;
   soup_id: string | null;
 };
 
@@ -23,87 +23,79 @@ function fmtSec(sec: number) {
 
 export default function MyRunsPage() {
   const router = useRouter();
-  
-
-  const [loading, setLoading] = useState(true);
-  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [rows, setRows] = useState<RunRow[]>([]);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        router.push("/login");
-        return;
-      }
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return router.push("/login");
 
-      setLoading(true);
-      const { data, error } = await supabase
+      const { data: list, error } = await supabase
         .from("runs")
-        .select("id, created_at, win, duration_sec, mode, soup_id")
-        .order("created_at", { ascending: false })
+        .select("id, ended_at, cleared_count, duration_sec, mode, soup_id")
+        .order("ended_at", { ascending: false })
         .limit(50);
 
-      if (!error && data) setRuns(data as any);
-      setLoading(false);
+      if (error) return setErr(error.message);
+      setRows((list as any) ?? []);
     })();
-  }, [router, supabase]);
+  }, [router]);
 
   return (
-    <>
-      <div className="hero">
-        <h1 className="h1">Me / Runs</h1>
-        <div className="sub">Your recent sessions and results.</div>
+    <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-white">我嘅紀錄</h1>
+        <button
+          onClick={() => router.push("/game")}
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 hover:bg-white/10 transition"
+        >
+          返去開局
+        </button>
       </div>
 
-      <div className="card">
-        <div className="cardPad">
-          <div className="cardHeader">
-            <div className="cardTitle">
-              <strong>Recent Runs</strong>
-              <span>{loading ? "Loading…" : `Showing ${runs.length} runs`}</span>
-            </div>
-          </div>
+      {err ? <p className="text-sm text-rose-200">{err}</p> : null}
 
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 110 }}>Result</th>
-                <th style={{ width: 110 }} className="tRight">
-                  Time
-                </th>
-                <th style={{ width: 120 }}>Mode</th>
-                <th>Soup ID</th>
-                <th style={{ width: 180 }}>Created</th>
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        <table className="w-full border-collapse">
+          <thead className="bg-white/5">
+            <tr className="text-left text-xs text-white/60">
+              <th className="px-3 py-2 w-20">ID</th>
+              <th className="px-3 py-2 w-56">完場時間</th>
+              <th className="px-3 py-2 w-24">結果</th>
+              <th className="px-3 py-2 text-right w-24">用時</th>
+              <th className="px-3 py-2 w-28">模式</th>
+              <th className="px-3 py-2">題目ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5">
+                <td className="px-3 py-2 text-white/70">{r.id}</td>
+                <td className="px-3 py-2 text-white/70">
+                  {new Date(r.ended_at).toLocaleString()}
+                </td>
+                <td className="px-3 py-2">
+                  <span
+                    className={`rounded-full border px-2 py-1 text-xs ${
+                      r.cleared_count > 0
+                        ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-100"
+                        : "border-rose-300/30 bg-rose-300/10 text-rose-100"
+                    }`}
+                  >
+                    {r.cleared_count > 0 ? "通關" : "未通關"}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right text-white/70">{fmtSec(r.duration_sec)}</td>
+                <td className="px-3 py-2 text-white/70">{r.mode}</td>
+                <td className="px-3 py-2 text-white/70">{r.soup_id ?? "(null)"}</td>
               </tr>
-            </thead>
-            <tbody>
-              {runs.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <span className="badge">
-                      <span className={`dot ${r.win ? "dotGood" : "dotBad"}`} />
-                      {r.win ? "WIN" : "LOSE"}
-                    </span>
-                  </td>
-                  <td className="tRight mono">{fmtSec(r.duration_sec)}</td>
-                  <td className="mono">{r.mode ?? "-"}</td>
-                  <td className="mono">{r.soup_id ?? "-"}</td>
-                  <td className="mono">
-                    {new Date(r.created_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-              {!loading && runs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="mono">
-                    No runs yet. Go play a game.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </>
+
+      <p className="text-xs text-white/55">提示：通關多啲，上榜快啲～</p>
+    </div>
   );
 }
