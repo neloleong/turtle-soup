@@ -45,7 +45,7 @@ export default function HomePage() {
         <button onClick={() => router.push("/leaderboard")}>Leaderboard</button>
         <button onClick={() => router.push("/me/runs")}>My Runs</button>
         <button onClick={() => router.push("/profile")}>Profile</button>
-        <button onClick={signOut}>Sign Out</button>
+        <button onClick={signOut}>Logout</button>
       </div>
 
       <hr style={{ margin: "16px 0" }} />

@@ -20,8 +20,8 @@ export default function LoginPage() {
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
     setLoading(false);
-    if (error) return setMsg("Sign Up 失敗: " + error.message);
-    setMsg("✅ 已註冊。如有開電郵確認，請去收信；否則可直接 Sign In。");
+    if (error) return setMsg("Register 失敗: " + error.message);
+    setMsg("✅ 已註冊。如有開電郵確認，請去收信；否則可直接 Login。");
   };
 
   const signIn = async () => {
@@ -31,7 +31,7 @@ export default function LoginPage() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
-    if (error) return setMsg("Sign In 失敗: " + error.message);
+    if (error) return setMsg("Login 失敗: " + error.message);
     setMsg("✅ 登入成功，跳轉中...");
     router.push("/");
   };
@@ -61,14 +61,14 @@ export default function LoginPage() {
             disabled={!canSubmit}
             style={{ padding: "8px 12px", cursor: canSubmit ? "pointer" : "not-allowed" }}
           >
-            {loading ? "..." : "Sign Up"}
+            {loading ? "..." : "Register"}
           </button>
           <button
             onClick={signIn}
             disabled={!canSubmit}
             style={{ padding: "8px 12px", cursor: canSubmit ? "pointer" : "not-allowed" }}
           >
-            {loading ? "..." : "Sign In"}
+            {loading ? "..." : "Login"}
           </button>
         </div>
 
