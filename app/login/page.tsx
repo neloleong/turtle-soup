@@ -31,16 +31,16 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (error) return setMsg("登入失敗： " + error.message);
-    router.push("/game");
+
+    // ✅ 登入後去控制面版
+    router.push("/dashboard");
     router.refresh();
   };
 
   return (
     <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
       <h1 className="text-2xl font-semibold text-white">登入</h1>
-      <p className="text-sm text-white/70">
-        想玩就快啲登入／註冊啦～
-      </p>
+      <p className="text-sm text-white/70">登入後先去控制面版，自己揀玩唔玩。</p>
 
       <div className="space-y-2">
         <input

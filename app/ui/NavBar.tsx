@@ -61,6 +61,7 @@ export default function NavBar() {
         </div>
 
         <nav className="flex flex-wrap items-center gap-2">
+          {pill("/dashboard", "面版")}
           {pill("/game", "開局")}
           {pill("/leaderboard", "排行榜")}
           {pill("/me/runs", "我嘅紀錄")}
