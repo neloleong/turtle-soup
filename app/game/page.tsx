@@ -1,360 +1,294 @@
+// /app/game/page.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
-
-type Verdict = "是" | "否" | "無關" | "接近了" | "請再具體";
 
 type Soup = {
   id: string;
   title: string;
-  surface: string;
-  solution: string;
+  story: string;
+  answer?: string;
   winKeywords: string[];
-  yesKeywords: string[];
-  noKeywords: string[];
-  nearKeywords?: string[];
 };
 
 type Msg = {
-  role: "player" | "system";
+  role: "me" | "sys";
   text: string;
   at: number;
 };
 
-function normalize(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[，。！？、,.!?]/g, "");
+function nowSec(startAt: number) {
+  return Math.floor((Date.now() - startAt) / 1000);
+}
+function fmtSec(sec: number) {
+  const s = Math.max(0, sec || 0);
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
-function includesAny(input: string, keywords: string[]) {
-  const t = normalize(input);
-  return keywords.some((k) => normalize(k) && t.includes(normalize(k)));
+function simpleJudge(input: string) {
+  // 你而家 MVP：簡單回覆（可後續再做更智能）
+  const s = input.trim().toLowerCase();
+  if (!s) return "Please type a question.";
+  if (s.includes("?") || s.includes("？")) return "Maybe.";
+  if (s.includes("is it") || s.includes("係唔係")) return "Yes/No/Not related.";
+  return "Not sure — ask as a Yes/No question.";
 }
 
 export default function GamePage() {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  
+  const chatRef = useRef<HTMLDivElement | null>(null);
 
-  // 題庫（從 /public/soups.json 載入）
   const [soups, setSoups] = useState<Soup[]>([]);
-  const [soupsLoaded, setSoupsLoaded] = useState(false);
-  const [soupIndex, setSoupIndex] = useState(0);
+  const [soup, setSoup] = useState<Soup | null>(null);
 
-  // 遊戲狀態（✅ 不計 wrong，只記 win/lose + time）
-  const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [startAt, setStartAt] = useState<number>(Date.now());
+  const [tick, setTick] = useState(0);
+
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [ended, setEnded] = useState(false);
-  const [tip, setTip] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const soup = soups[soupIndex];
+  const mode = "mvp"; // 如你之後有多模式，可以擴展
 
-  // 1) 載入題庫 JSON（只做一次）
   useEffect(() => {
-    const loadSoups = async () => {
-      try {
-        const res = await fetch("/soups.json", { cache: "no-store" });
-        const data = (await res.json()) as Soup[];
-        setSoups(Array.isArray(data) ? data : []);
-      } catch {
-        setSoups([]);
-      } finally {
-        setSoupsLoaded(true);
-      }
-    };
-    loadSoups();
+    const t = setInterval(() => setTick((x) => x + 1), 500);
+    return () => clearInterval(t);
   }, []);
 
-  // 2) 每次題目切換：檢查登入 + 檢查暱稱 + 初始化對話
   useEffect(() => {
-    const boot = async () => {
-      if (!soupsLoaded) return;
-
-      if (!soups.length) {
-        setLoading(false);
-        setMsgs([
-          {
-            role: "system",
-            text: "❌ 題庫載入失敗或為空。\n請檢查 /public/soups.json 是否存在、是否為合法 JSON 陣列。",
-            at: Date.now(),
-          },
-        ]);
-        return;
-      }
-
-      const safeIndex = Math.max(0, Math.min(soupIndex, soups.length - 1));
-      if (safeIndex !== soupIndex) {
-        setSoupIndex(safeIndex);
-        return;
-      }
-
-      setLoading(true);
-      setTip("");
-
+    (async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        setLoading(false);
         router.push("/login");
         return;
       }
-      setUserEmail(data.user.email ?? "");
 
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", data.user.id)
-        .single();
+      const res = await fetch("/soups.json", { cache: "no-store" });
+      const json = (await res.json()) as Soup[];
+      setSoups(json);
 
-      if (!error) {
-        const dn = (profile?.display_name ?? "").trim();
-        if (!dn) {
-          setLoading(false);
-          router.push("/profile");
-          return;
-        }
-      }
-
-      const s = soups[safeIndex];
+      const pick = json[Math.floor(Math.random() * Math.max(1, json.length))] ?? null;
+      setSoup(pick);
+      setStartAt(Date.now());
       setMsgs([
         {
-          role: "system",
-          text:
-            `【${s.title}】\n` +
-            `湯面：${s.surface}\n\n` +
-            `玩法：你可以提問／猜測，我會回「是/否/無關/接近了」。\n` +
-            `計分：只記錄「過關/不過關」，不計錯誤次數。\n`,
+          role: "sys",
+          text: pick
+            ? `🧩 Mystery loaded: "${pick.title}". Ask Yes/No questions to solve it.`
+            : "No soups found. Please check /public/soups.json",
+          at: Date.now(),
+        },
+        ...(pick
+          ? [
+              { role: "sys" as const, text: pick.story, at: Date.now() },
+              {
+                role: "sys" as const,
+                text: "Win condition: your message contains any win keyword.",
+                at: Date.now(),
+              },
+            ]
+          : []),
+      ]);
+    })();
+  }, [router, supabase]);
+
+  useEffect(() => {
+    // auto scroll to bottom
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [msgs]);
+
+  function containsWin(text: string) {
+    if (!soup) return false;
+    const t = text.toLowerCase();
+    return soup.winKeywords.some((k) => t.includes(String(k).toLowerCase()));
+  }
+
+  async function finish(win: boolean) {
+    if (!soup) return;
+
+    setBusy(true);
+    try {
+      const duration = nowSec(startAt);
+
+      // ✅ RPC: finish_run(p_win, p_wrong, p_duration_sec, p_mode, p_soup_id)
+      const { error } = await supabase.rpc("finish_run", {
+        p_win: win,
+        p_wrong: 0,
+        p_duration_sec: duration,
+        p_mode: mode,
+        p_soup_id: soup.id,
+      });
+
+      if (error) throw error;
+
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "sys",
+          text: win
+            ? `✅ Cleared! Saved to your stats. Time: ${fmtSec(duration)}`
+            : `🧾 Finished (not cleared). Saved. Time: ${fmtSec(duration)}`,
           at: Date.now(),
         },
       ]);
-
-      setStartedAt(null);
-      setEnded(false);
-      setInput("");
-      setLoading(false);
-
-      setTimeout(() => inputRef.current?.focus(), 0);
-    };
-
-    boot();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, soupsLoaded, soups.length, soupIndex]);
-
-  function decideVerdict(text: string): Verdict {
-    const t = text.trim();
-    if (t.length < 2) return "請再具體";
-    if (soup?.nearKeywords && includesAny(t, soup.nearKeywords)) return "接近了";
-    if (soup && includesAny(t, soup.yesKeywords)) return "是";
-    if (soup && includesAny(t, soup.noKeywords)) return "否";
-    return "無關";
-  }
-
-  async function finishRun(win: boolean) {
-    if (ended || !soup) return;
-
-    const endAt = Date.now();
-    const durationSec =
-      startedAt === null ? 0 : Math.max(0, Math.floor((endAt - startedAt) / 1000));
-
-    setTip("");
-
-    // ✅ 新版 finish_run 要傳 p_soup_id
-    const { data, error } = await supabase.rpc("finish_run", {
-      p_soup_id: soup.id,
-      p_cleared_count: win ? 1 : 0,
-      p_wrong_count: 0,
-      p_duration_sec: durationSec,
-      p_mode: "standard",
-    });
-
-    if (error) {
-      setTip("finish_run 失敗：" + error.message);
-      return;
-    }
-
-    setEnded(true);
-
-    setMsgs((prev) => [
-      ...prev,
-      {
-        role: "system",
-        text:
-          (win ? "🎉 通關！" : "⛔ 已結束（未通關）") +
-          `\n用時：${durationSec}s` +
-          `\n（runs 已寫入：id=${data?.id ?? "?"} / soup_id=${soup.id}）`,
-        at: Date.now(),
-      },
-      {
-        role: "system",
-        text: `【真相】${soup.solution}`,
-        at: Date.now() + 1,
-      },
-    ]);
-  }
-
-  async function onSubmit() {
-    if (!soup) return;
-
-    const t = input.trim();
-    if (!t || loading || ended) return;
-
-    if (startedAt === null) setStartedAt(Date.now());
-
-    setInput("");
-    setMsgs((prev) => [...prev, { role: "player", text: t, at: Date.now() }]);
-
-    // ✅ 通關判定：包含任意 winKeywords
-    const isWin = includesAny(t, soup.winKeywords);
-    if (isWin) {
-      setMsgs((prev) => [
-        ...prev,
-        { role: "system", text: "✅ 呢句已經觸發通關條件。", at: Date.now() + 1 },
+    } catch (e: any) {
+      setMsgs((m) => [
+        ...m,
+        { role: "sys", text: `❌ Save failed: ${e?.message ?? "Unknown error"}`, at: Date.now() },
       ]);
-      await finishRun(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || busy) return;
+
+    setInput("");
+    setMsgs((m) => [...m, { role: "me", text, at: Date.now() }]);
+
+    // win check
+    if (containsWin(text)) {
+      setMsgs((m) => [
+        ...m,
+        { role: "sys", text: "🎯 Win keyword detected.", at: Date.now() },
+      ]);
+      await finish(true);
       return;
     }
 
-    // 未通關：只回覆，不加 wrong
-    const verdict = decideVerdict(t);
-    setMsgs((prev) => [
-      ...prev,
-      { role: "system", text: `【回覆】${verdict}`, at: Date.now() + 1 },
-    ]);
+    setBusy(true);
+    try {
+      // MVP reply
+      const reply = simpleJudge(text);
+      setMsgs((m) => [...m, { role: "sys", text: reply, at: Date.now() }]);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function nextSoup() {
+  function newGame() {
     if (!soups.length) return;
-    setSoupIndex((i) => (i + 1) % soups.length);
-  }
-
-  function restartThisSoup() {
-    if (!soup) return;
-    setMsgs([
-      {
-        role: "system",
-        text:
-          `【${soup.title}】\n` +
-          `湯面：${soup.surface}\n\n` +
-          `玩法：你可以提問／猜測，我會回「是/否/無關/接近了」。\n` +
-          `計分：只記錄「過關/不過關」，不計錯誤次數。\n`,
-        at: Date.now(),
-      },
-    ]);
-    setStartedAt(null);
-    setEnded(false);
+    const pick = soups[Math.floor(Math.random() * soups.length)];
+    setSoup(pick);
+    setStartAt(Date.now());
     setInput("");
-    setTip("");
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
-
-  if (!soupsLoaded) {
-    return (
-      <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-        <h1>Game</h1>
-        <p>Loading soups.json...</p>
-      </div>
-    );
-  }
-
-  if (soupsLoaded && !soups.length) {
-    return (
-      <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-        <h1>Game</h1>
-        <p>❌ 題庫為空。請檢查 `public/soups.json`。</p>
-      </div>
-    );
-  }
-
-  if (loading || !soup) {
-    return (
-      <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-        <h1>Game</h1>
-        <p>Loading...</p>
-      </div>
-    );
+    setMsgs([
+      { role: "sys", text: `🧩 New mystery: "${pick.title}"`, at: Date.now() },
+      { role: "sys", text: pick.story, at: Date.now() },
+      { role: "sys", text: "Ask Yes/No questions. Or give up anytime.", at: Date.now() },
+    ]);
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "20px auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Turtle Soup</h1>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>Signed in as: {userEmail}</div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button onClick={() => router.push("/leaderboard")}>Leaderboard</button>
-          <button onClick={() => router.push("/me/runs")}>My Runs</button>
-          <button onClick={() => router.push("/")}>Home</button>
+    <>
+      <div className="hero">
+        <h1 className="h1">Game</h1>
+        <div className="sub">
+          Ask. Narrow down. Trigger a win keyword to clear.
         </div>
       </div>
 
-      <hr style={{ margin: "16px 0" }} />
+      <div className="grid2">
+        <div className="card">
+          <div className="cardPad">
+            <div className="cardHeader">
+              <div className="cardTitle">
+                <strong>{soup ? soup.title : "Loading…"}</strong>
+                <span className="mono">
+                  soup_id: {soup?.id ?? "-"} · mode: {mode} · time:{" "}
+                  {fmtSec(nowSec(startAt))}
+                </span>
+              </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <strong>題目：</strong>
-        <span>{soup.title}</span>
-        <span style={{ fontSize: 12, opacity: 0.75 }}>
-          started: {startedAt ? "yes" : "no"} / ended: {ended ? "yes" : "no"} / soup_id: {soup.id}
-        </span>
-
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={restartThisSoup}>Restart</button>
-          <button onClick={nextSoup}>Next Soup</button>
-          <button onClick={() => finishRun(false)} disabled={ended}>
-            Give up（結束）
-          </button>
-        </div>
-      </div>
-
-      {tip && (
-        <div style={{ marginTop: 12, padding: 10, border: "1px solid #ddd" }}>
-          <strong>提示：</strong> {tip}
-        </div>
-      )}
-
-      <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd" }}>
-        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>對話</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {msgs.map((m) => (
-            <div
-              key={m.at}
-              style={{
-                whiteSpace: "pre-wrap",
-                padding: 10,
-                borderRadius: 8,
-                border: "1px solid #eee",
-                alignSelf: m.role === "player" ? "flex-end" : "flex-start",
-                maxWidth: "85%",
-              }}
-            >
-              <strong>{m.role === "player" ? "你" : "系統"}</strong>： {m.text}
+              <div className="btnRow">
+                <button className="btn btnSecondary" onClick={newGame} disabled={!soups.length || busy}>
+                  New
+                </button>
+                <button className="btn btnDanger" onClick={() => finish(false)} disabled={!soup || busy}>
+                  Give up
+                </button>
+              </div>
             </div>
-          ))}
+
+            <div ref={chatRef} className="chat">
+              {msgs.map((m, idx) => (
+                <div key={idx} className={`bubbleRow ${m.role === "me" ? "me" : "sys"}`}>
+                  <div className="bubble">
+                    <div>{m.text}</div>
+                    <div className="bubbleMeta">
+                      <span className="mono">{m.role === "me" ? "You" : "System"}</span>
+                      <span className="mono">
+                        {new Date(m.at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="footerBar">
+              <input
+                className="input"
+                placeholder={busy ? "Thinking…" : "Type a question… (Enter to send)"}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") send();
+                }}
+                disabled={!soup || busy}
+              />
+              <button className="btn btnPrimary" onClick={send} disabled={!soup || busy}>
+                Send
+              </button>
+            </div>
+
+            <div className="small" style={{ marginTop: 10 }}>
+              ✅ Your run will be saved via <span className="mono">finish_run</span> with{" "}
+              <span className="mono">soup_id</span>.
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="cardPad">
+            <div className="cardTitle">
+              <strong>How to clear</strong>
+              <span>Trigger any win keyword.</span>
+            </div>
+            <div className="hr" />
+            {soup ? (
+              <>
+                <div className="small">
+                  Win keywords:
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {soup.winKeywords.map((k, i) => (
+                      <span key={i} className="badge">
+                        <span className="dot dotGood" />
+                        <span className="mono">{k}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="hr" />
+                <div className="small">
+                  Tip: keep questions short and binary (Yes/No).
+                </div>
+              </>
+            ) : (
+              <div className="small">Loading soup…</div>
+            )}
+          </div>
         </div>
       </div>
-
-      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={ended ? "本局已結束，按 Next Soup 開新題" : "輸入你的提問/猜測..."}
-          disabled={ended}
-          style={{ flex: 1, padding: 10 }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSubmit();
-          }}
-        />
-        <button onClick={onSubmit} disabled={ended || !input.trim()}>
-          送出
-        </button>
-      </div>
-    </div>
+    </>
   );
 }

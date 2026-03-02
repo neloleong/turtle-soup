@@ -1,83 +1,158 @@
+// /app/login/page.tsx
 "use client";
 
-import { useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
+
+type Mode = "login" | "register";
 
 export default function LoginPage() {
   const router = useRouter();
+  
+
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState("");
+
+  const [msg, setMsg] = useState<string>("");
+  const [isErr, setIsErr] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.trim().length >= 6 && !loading;
-
-  const signUp = async () => {
-    console.log("CLICK: signUp");
-    setMsg("");
-    if (!canSubmit) return setMsg("請輸入 email + 密碼（至少 6 位）");
+  async function submit() {
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
-    setLoading(false);
-    if (error) return setMsg("Register 失敗: " + error.message);
-    setMsg("✅ 已註冊。如有開電郵確認，請去收信；否則可直接 Login。");
-  };
-
-  const signIn = async () => {
-    console.log("CLICK: signIn");
     setMsg("");
-    if (!canSubmit) return setMsg("請輸入 email + 密碼（至少 6 位）");
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoading(false);
-    if (error) return setMsg("Login 失敗: " + error.message);
-    setMsg("✅ 登入成功，跳轉中...");
-    router.push("/");
-  };
+    setIsErr(false);
+
+    try {
+      if (!email || !password) {
+        setIsErr(true);
+        setMsg("Please enter email and password.");
+        return;
+      }
+
+      if (mode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+
+        router.push("/game");
+        router.refresh();
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+
+        setIsErr(false);
+        setMsg(
+          "Registered. If email confirmation is enabled, please check your inbox. You can also try Login now."
+        );
+        setMode("login");
+      }
+    } catch (e: any) {
+      setIsErr(true);
+      setMsg(e?.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", padding: 16 }}>
-      <h1>Login</h1>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <input
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 8 }}
-        />
-        <input
-          placeholder="password (>=6)"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 8 }}
-        />
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={signUp}
-            disabled={!canSubmit}
-            style={{ padding: "8px 12px", cursor: canSubmit ? "pointer" : "not-allowed" }}
-          >
-            {loading ? "..." : "Register"}
-          </button>
-          <button
-            onClick={signIn}
-            disabled={!canSubmit}
-            style={{ padding: "8px 12px", cursor: canSubmit ? "pointer" : "not-allowed" }}
-          >
-            {loading ? "..." : "Login"}
-          </button>
+    <>
+      <div className="hero">
+        <h1 className="h1">Login</h1>
+        <div className="sub">
+          Clean UI, fast flow. No “Sign in”. Only <b>Login / Register</b>.
         </div>
-
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          canSubmit: {String(canSubmit)} / emailLen: {email.trim().length} / pwLen: {password.length}
-        </div>
-
-        {msg && <p style={{ whiteSpace: "pre-wrap" }}>{msg}</p>}
       </div>
-    </div>
+
+      <div className="grid2">
+        <div className="card">
+          <div className="cardPad">
+            <div className="cardHeader">
+              <div className="cardTitle">
+                <strong>{mode === "login" ? "Login" : "Register"}</strong>
+                <span>Use your email to access your account.</span>
+              </div>
+              <span className="badge">
+                <span className={`dot ${mode === "login" ? "dotGood" : "dotWarn"}`} />
+                {mode === "login" ? "Existing user" : "New user"}
+              </span>
+            </div>
+
+            <div className="formRow">
+              <div className="label">Email</div>
+              <input
+                className="input"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="formRow">
+              <div className="label">Password</div>
+              <input
+                className="input"
+                placeholder="••••••••"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
+              />
+            </div>
+
+            <div className="btnRow">
+              <button
+                className="btn btnPrimary"
+                onClick={submit}
+                disabled={loading}
+              >
+                {loading ? "Working…" : mode === "login" ? "Login" : "Register"}
+              </button>
+
+              <button
+                className="btn btnSecondary"
+                onClick={() => setMode(mode === "login" ? "register" : "login")}
+                disabled={loading}
+              >
+                {mode === "login" ? "Switch to Register" : "Switch to Login"}
+              </button>
+            </div>
+
+            {msg ? (
+              <div className={`toast ${isErr ? "toastBad" : "toastGood"}`} style={{ marginTop: 12 }}>
+                {msg}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="cardPad">
+            <div className="cardTitle">
+              <strong>What you can do</strong>
+              <span>MVP loop is live.</span>
+            </div>
+            <div className="hr" />
+            <div className="small">
+              ✅ Login → ✅ Game → ✅ finish_run → ✅ Leaderboard / Me Runs
+              <br />
+              <br />
+              Tips:
+              <br />• First time login: go <b>Profile</b> to set display name.
+              <br />• Your runs are saved and visible in <b>Me / Runs</b>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

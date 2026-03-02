@@ -1,81 +1,123 @@
+// /app/profile/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  
+
+  const [loading, setLoading] = useState(true);
+  const [uid, setUid] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+
+  const [displayName, setDisplayName] = useState("");
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isErr, setIsErr] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       const { data } = await supabase.auth.getUser();
-      if (!data.user) return router.push("/login");
+      const user = data.user;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUid(user.id);
+      setEmail(user.email ?? null);
 
-      const { data: profile, error } = await supabase
+      const { data: prof, error } = await supabase
         .from("profiles")
         .select("display_name")
-        .eq("id", data.user.id)
-        .single();
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (!error && profile?.display_name) {
-        // 已有名，直接回首頁
-        router.push("/");
-      }
-    };
-    load();
-  }, [router]);
+      if (!error && prof?.display_name) setDisplayName(prof.display_name);
 
-  const save = async () => {
-    setMsg("");
-    const v = name.trim();
-    if (v.length < 2) return setMsg("暱稱最少 2 個字。");
-    if (v.length > 20) return setMsg("暱稱最多 20 個字。");
-
-    setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) {
       setLoading(false);
-      return router.push("/login");
+    })();
+  }, [router, supabase]);
+
+  async function save() {
+    setMsg("");
+    setIsErr(false);
+
+    if (!uid) return;
+
+    const name = displayName.trim();
+    if (!name) {
+      setIsErr(true);
+      setMsg("Display name cannot be empty.");
+      return;
     }
 
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: v })
-      .eq("id", uid);
+      .upsert({ id: uid, display_name: name });
 
-    setLoading(false);
-    if (error) return setMsg("保存失敗: " + error.message);
+    if (error) {
+      setIsErr(true);
+      setMsg(error.message);
+      return;
+    }
 
-    router.push("/leaderboard");
-  };
+    setIsErr(false);
+    setMsg("Saved.");
+    router.refresh();
+  }
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", padding: 16 }}>
-      <h1>設定暱稱</h1>
-      <p>暱稱會顯示喺排行榜。</p>
-
-      <input
-        placeholder="例如：EmitTong"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ padding: 8, width: "100%", marginTop: 8 }}
-      />
-
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button onClick={save} disabled={loading}>
-          {loading ? "保存中..." : "保存"}
-        </button>
-        <button onClick={() => router.push("/")} disabled={loading}>
-          之後再講
-        </button>
+    <>
+      <div className="hero">
+        <h1 className="h1">Profile</h1>
+        <div className="sub">Set a display name for leaderboard and runs.</div>
       </div>
 
-      {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
-    </div>
+      <div className="card">
+        <div className="cardPad">
+          <div className="cardHeader">
+            <div className="cardTitle">
+              <strong>Display Name</strong>
+              <span className="mono">{email ?? ""}</span>
+            </div>
+            <span className="badge">
+              <span className={`dot ${loading ? "dotWarn" : "dotGood"}`} />
+              {loading ? "Loading" : "Ready"}
+            </span>
+          </div>
+
+          <div className="formRow">
+            <div className="label">Name</div>
+            <input
+              className="input"
+              placeholder="e.g. Derek"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+          </div>
+
+          <div className="btnRow">
+            <button className="btn btnPrimary" onClick={save} disabled={loading}>
+              Save
+            </button>
+            <button
+              className="btn btnSecondary"
+              onClick={() => router.push("/leaderboard")}
+              disabled={loading}
+            >
+              Go to Leaderboard
+            </button>
+          </div>
+
+          {msg ? (
+            <div className={`toast ${isErr ? "toastBad" : "toastGood"}`} style={{ marginTop: 12 }}>
+              {msg}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </>
   );
 }

@@ -1,72 +1,109 @@
+// /app/me/runs/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../../../lib/supabaseClient";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabaseClient";
 
 type RunRow = {
-  id: number;
-  ended_at: string;
-  cleared_count: number; // 1 = win, 0 = lose
+  id: string;
+  created_at: string;
+  win: boolean;
   duration_sec: number;
-  mode: string;
+  mode: string | null;
   soup_id: string | null;
 };
 
+function fmtSec(sec: number) {
+  const s = Math.max(0, sec || 0);
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+}
+
 export default function MyRunsPage() {
   const router = useRouter();
-  const [rows, setRows] = useState<RunRow[]>([]);
-  const [err, setErr] = useState("");
+  
+
+  const [loading, setLoading] = useState(true);
+  const [runs, setRuns] = useState<RunRow[]>([]);
 
   useEffect(() => {
-    const run = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return router.push("/login");
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        router.push("/login");
+        return;
+      }
 
-      const { data: list, error } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from("runs")
-        .select("id, ended_at, cleared_count, duration_sec, mode, soup_id")
-        .order("ended_at", { ascending: false })
+        .select("id, created_at, win, duration_sec, mode, soup_id")
+        .order("created_at", { ascending: false })
         .limit(50);
 
-      if (error) return setErr(error.message);
-      setRows((list as any) ?? []);
-    };
-
-    run();
-  }, [router]);
+      if (!error && data) setRuns(data as any);
+      setLoading(false);
+    })();
+  }, [router, supabase]);
 
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-      <h1>My Runs</h1>
-      <button onClick={() => router.push("/")}>Back</button>
+    <>
+      <div className="hero">
+        <h1 className="h1">Me / Runs</h1>
+        <div className="sub">Your recent sessions and results.</div>
+      </div>
 
-      {err && <p>{err}</p>}
+      <div className="card">
+        <div className="cardPad">
+          <div className="cardHeader">
+            <div className="cardTitle">
+              <strong>Recent Runs</strong>
+              <span>{loading ? "Loading…" : `Showing ${runs.length} runs`}</span>
+            </div>
+          </div>
 
-      <table style={{ width: "100%", marginTop: 12, borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">ID</th>
-            <th align="left">Ended</th>
-            <th align="left">Result</th>
-            <th align="right">Time(s)</th>
-            <th align="left">Mode</th>
-            <th align="left">Soup ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>{r.id}</td>
-              <td>{new Date(r.ended_at).toLocaleString()}</td>
-              <td>{r.cleared_count > 0 ? "WIN" : "LOSE"}</td>
-              <td align="right">{r.duration_sec ?? 0}</td>
-              <td>{r.mode}</td>
-              <td>{r.soup_id ?? "(null)"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{ width: 110 }}>Result</th>
+                <th style={{ width: 110 }} className="tRight">
+                  Time
+                </th>
+                <th style={{ width: 120 }}>Mode</th>
+                <th>Soup ID</th>
+                <th style={{ width: 180 }}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <span className="badge">
+                      <span className={`dot ${r.win ? "dotGood" : "dotBad"}`} />
+                      {r.win ? "WIN" : "LOSE"}
+                    </span>
+                  </td>
+                  <td className="tRight mono">{fmtSec(r.duration_sec)}</td>
+                  <td className="mono">{r.mode ?? "-"}</td>
+                  <td className="mono">{r.soup_id ?? "-"}</td>
+                  <td className="mono">
+                    {new Date(r.created_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+              {!loading && runs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="mono">
+                    No runs yet. Go play a game.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
