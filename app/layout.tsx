@@ -11,6 +11,9 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "Turtle Soup",
   description: "A text-based Turtle Soup mystery game.",
+  verification: {
+    google: "l4jW3ViZI7ZQlkP5K4YAtFVIMbZ3fsVayoQGN7vcM_I",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
