@@ -163,10 +163,7 @@ export default function HomePage() {
 
       {/* QUICK LINKS */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card
-          title="功能入口"
-          desc="你可以由呢度直接去到你需要嘅功能。"
-        >
+        <Card title="功能入口" desc="你可以由呢度直接去到你需要嘅功能。">
           <div className="flex flex-wrap gap-2">
             <SecondaryButton href="/leaderboard">排行榜</SecondaryButton>
             <SecondaryButton href="/me/runs">我嘅紀錄</SecondaryButton>
@@ -178,10 +175,7 @@ export default function HomePage() {
           </div>
         </Card>
 
-        <Card
-          title="小貼士"
-          desc="想推得快？用呢幾招。"
-        >
+        <Card title="小貼士" desc="想推得快？用呢幾招。">
           <ul className="list-disc pl-5 text-sm text-white/75 space-y-2">
             <li>先問「有冇人死咗／受傷／犯罪」呢類大方向。</li>
             <li>每次只問一個條件，避免一次問兩樣。</li>
@@ -192,7 +186,14 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <div className="pb-4 text-center text-xs text-white/45">
-        © {new Date().getFullYear()} Turtle Soup · Made for fun & logic.
+        © {new Date().getFullYear()} Turtle Soup ·{" "}
+        <Link className="underline hover:text-white" href="/privacy">
+          私隱政策
+        </Link>{" "}
+        ·{" "}
+        <Link className="underline hover:text-white" href="/terms">
+          使用條款
+        </Link>
       </div>
     </div>
   );
