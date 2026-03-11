@@ -63,6 +63,7 @@ export default function NavBar() {
         <nav className="flex flex-wrap items-center gap-2">
           {pill("/dashboard", "面版")}
           {pill("/start", "開局")}
+          {pill("/how-to-play", "玩法")}
           {pill("/leaderboard", "排行榜")}
           {pill("/me/runs", "我嘅紀錄")}
           {pill("/profile", "改名")}
