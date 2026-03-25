@@ -20,6 +20,7 @@ export default function NavBar() {
       setEmail(data.user?.email ?? null);
 
       const result = await getCurrentUserRole();
+      console.log("NavBar role result:", result);
       setRole(result.role);
     }
 
@@ -30,6 +31,7 @@ export default function NavBar() {
 
       if (session?.user) {
         const result = await getCurrentUserRole();
+        console.log("NavBar role result on auth change:", result);
         setRole(result.role);
       } else {
         setRole(null);
@@ -74,8 +76,7 @@ export default function NavBar() {
           <div className="leading-tight">
             <div className="text-sm font-semibold text-white">海龜湯</div>
             <div className="text-xs text-white/55">
-              {email ? `你已登入：${email}` : "未登入"}
-              {role === "admin" ? " ／ admin" : ""}
+              {email ? `你已登入：${email}` : "未登入"} {role ? `／ ${role}` : "／ role 未讀到"}
             </div>
           </div>
         </div>
@@ -87,6 +88,7 @@ export default function NavBar() {
           {pill("/leaderboard", "排行榜")}
           {pill("/me/runs", "我嘅紀錄")}
           {pill("/profile", "改名")}
+
           {role === "admin" && pill("/admin", "管理後台")}
 
           {email ? (
