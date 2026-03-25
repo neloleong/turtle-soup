@@ -22,18 +22,20 @@ export default function NavBar() {
     }
 
     async function loadUserState() {
-  if (!supabase) {
-    setEmail(null);
-    setRole(null);
-    return;
-  }
+      const client = supabase;
 
-  const { data } = await supabase.auth.getUser();
-  setEmail(data.user?.email ?? null);
+      if (!client) {
+        setEmail(null);
+        setRole(null);
+        return;
+      }
 
-  const result = await getCurrentUserRole();
-  setRole(result.role);
-}
+      const { data } = await client.auth.getUser();
+      setEmail(data.user?.email ?? null);
+
+      const result = await getCurrentUserRole();
+      setRole(result.role);
+    }
 
     loadUserState();
 
@@ -103,23 +105,29 @@ export default function NavBar() {
         </div>
 
         <nav className="flex flex-wrap items-center gap-2">
-          {pill("/dashboard", "面版")}
-          {pill("/start", "開局")}
-          {pill("/how-to-play", "玩法")}
-          {pill("/leaderboard", "排行榜")}
-          {pill("/me/runs", "我嘅紀錄")}
-          {pill("/profile", "改名")}
-          {role === "admin" && pill("/admin", "管理後台")}
-
-          {email ? (
-            <button
-              onClick={logout}
-              className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10 hover:border-white/25"
-            >
-              登出
-            </button>
+          {!email ? (
+            <>
+              {pill("/how-to-play", "玩法")}
+              {pill("/leaderboard", "排行榜")}
+              {pill("/login", "登入")}
+            </>
           ) : (
-            pill("/login", "登入")
+            <>
+              {pill("/dashboard", "面版")}
+              {pill("/start", "開局")}
+              {pill("/how-to-play", "玩法")}
+              {pill("/leaderboard", "排行榜")}
+              {pill("/me/runs", "我嘅紀錄")}
+              {pill("/profile", "改名")}
+              {role === "admin" && pill("/admin", "管理後台")}
+
+              <button
+                onClick={logout}
+                className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10 hover:border-white/25"
+              >
+                登出
+              </button>
+            </>
           )}
         </nav>
       </div>
