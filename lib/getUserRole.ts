@@ -3,13 +3,17 @@
 import { supabase } from "./supabaseClient";
 
 export async function getCurrentUserRole() {
+  if (!supabase) {
+    return {
+      user: null,
+      role: null as "admin" | "player" | null,
+    };
+  }
+
   const {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-
-  console.log("getCurrentUserRole user:", user);
-  console.log("getCurrentUserRole userError:", userError);
 
   if (userError || !user) {
     return {
@@ -20,12 +24,9 @@ export async function getCurrentUserRole() {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, role")
+    .select("role")
     .eq("id", user.id)
     .single();
-
-  console.log("getCurrentUserRole profile:", profile);
-  console.log("getCurrentUserRole profileError:", profileError);
 
   if (profileError || !profile) {
     return {

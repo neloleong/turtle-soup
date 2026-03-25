@@ -15,34 +15,54 @@ export default function NavBar() {
   const [role, setRole] = useState<"admin" | "player" | null>(null);
 
   useEffect(() => {
-    async function loadUserState() {
-      const { data } = await supabase.auth.getUser();
-      setEmail(data.user?.email ?? null);
-
-      const result = await getCurrentUserRole();
-      console.log("NavBar role result:", result);
-      setRole(result.role);
+    if (!supabase) {
+      setEmail(null);
+      setRole(null);
+      return;
     }
+
+    async function loadUserState() {
+  if (!supabase) {
+    setEmail(null);
+    setRole(null);
+    return;
+  }
+
+  const { data } = await supabase.auth.getUser();
+  setEmail(data.user?.email ?? null);
+
+  const result = await getCurrentUserRole();
+  setRole(result.role);
+}
 
     loadUserState();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
-      setEmail(session?.user?.email ?? null);
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setEmail(session?.user?.email ?? null);
 
-      if (session?.user) {
-        const result = await getCurrentUserRole();
-        console.log("NavBar role result on auth change:", result);
-        setRole(result.role);
-      } else {
-        setRole(null);
+        if (session?.user) {
+          const result = await getCurrentUserRole();
+          setRole(result.role);
+        } else {
+          setRole(null);
+        }
       }
-    });
+    );
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   async function logout() {
+    if (!supabase) {
+      router.push("/login");
+      return;
+    }
+
     await supabase.auth.signOut();
+    setEmail(null);
     setRole(null);
     router.push("/login");
     router.refresh();
@@ -76,7 +96,8 @@ export default function NavBar() {
           <div className="leading-tight">
             <div className="text-sm font-semibold text-white">海龜湯</div>
             <div className="text-xs text-white/55">
-              {email ? `你已登入：${email}` : "未登入"} {role ? `／ ${role}` : "／ role 未讀到"}
+              {email ? `你已登入：${email}` : "未登入"}
+              {role ? ` ／ ${role}` : ""}
             </div>
           </div>
         </div>
@@ -88,7 +109,6 @@ export default function NavBar() {
           {pill("/leaderboard", "排行榜")}
           {pill("/me/runs", "我嘅紀錄")}
           {pill("/profile", "改名")}
-
           {role === "admin" && pill("/admin", "管理後台")}
 
           {email ? (

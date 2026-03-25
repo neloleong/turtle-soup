@@ -22,6 +22,12 @@ export default function SoupCreateForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!supabase) {
+      setErrorText("Supabase 未初始化。");
+      return;
+    }
+
     setSubmitting(true);
     setMessage("");
     setErrorText("");
