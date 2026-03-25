@@ -85,9 +85,7 @@ export default function LoginPage() {
         <div className="mb-6">
           <p className="mb-2 text-sm text-cyan-300">Account</p>
           <h1 className="text-3xl font-bold">登入 / 註冊</h1>
-          <p className="mt-2 text-sm text-white/65">
-            用 email 同密碼登入，admin / player 都共用同一入口。
-          </p>
+          
         </div>
 
         <div className="space-y-5">
