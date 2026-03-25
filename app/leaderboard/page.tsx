@@ -5,78 +5,127 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-type Row = {
+type LeaderboardRow = {
   user_id: string;
-  display_name: string | null;
-  cleared_count: number;
+  cleared_count: number | null;
+  profiles:
+    | {
+        display_name: string | null;
+      }
+    | {
+        display_name: string | null;
+      }[]
+    | null;
 };
 
 export default function LeaderboardPage() {
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>([]);
+
+  const [rows, setRows] = useState<LeaderboardRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return router.push("/login");
+    async function loadLeaderboard() {
+      setLoading(true);
+      setErr("");
 
-      const { data: list, error } = await supabase
+      const client = supabase;
+
+      if (!client) {
+        setErr("Supabase 未初始化。");
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userErr,
+      } = await client.auth.getUser();
+
+      if (userErr) {
+        setErr(userErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data, error } = await client
         .from("player_stats")
         .select("user_id, cleared_count, profiles(display_name)")
         .order("cleared_count", { ascending: false })
-        .limit(50);
+        .limit(100);
 
-      if (error) return setErr(error.message);
+      if (error) {
+        setErr(error.message);
+        setLoading(false);
+        return;
+      }
 
-      const mapped: Row[] = (list ?? []).map((r: any) => ({
-        user_id: r.user_id,
-        cleared_count: r.cleared_count ?? 0,
-        display_name: r.profiles?.display_name ?? null,
-      }));
+      setRows((data as LeaderboardRow[]) ?? []);
+      setLoading(false);
+    }
 
-      setRows(mapped);
-    })();
+    loadLeaderboard();
   }, [router]);
 
+  function getDisplayName(row: LeaderboardRow) {
+    if (!row.profiles) return "未命名玩家";
+    if (Array.isArray(row.profiles)) {
+      return row.profiles[0]?.display_name?.trim() || "未命名玩家";
+    }
+    return row.profiles.display_name?.trim() || "未命名玩家";
+  }
+
   return (
-    <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-white">排行榜</h1>
-        <button
-          onClick={() => router.push("/game")}
-          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 hover:bg-white/10 transition"
-        >
-          返去開局
-        </button>
-      </div>
+    <main className="space-y-4">
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">排行榜</h1>
+            <p className="mt-1 text-sm text-white/65">
+              依通關數由高到低排列
+            </p>
+          </div>
+        </div>
 
-      {err ? <p className="text-sm text-rose-200">{err}</p> : null}
+        {err ? (
+          <div className="mt-4 rounded-xl border border-rose-300/30 bg-rose-300/10 p-3 text-sm text-rose-100">
+            {err}
+          </div>
+        ) : null}
+      </section>
 
-      <div className="overflow-hidden rounded-xl border border-white/10">
-        <table className="w-full border-collapse">
-          <thead className="bg-white/5">
-            <tr className="text-left text-xs text-white/60">
-              <th className="px-3 py-2 w-16">名次</th>
-              <th className="px-3 py-2">玩家</th>
-              <th className="px-3 py-2 text-right w-28">通關</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.user_id} className="border-t border-white/5 hover:bg-white/5">
-                <td className="px-3 py-2 text-white/70">{i + 1}</td>
-                <td className="px-3 py-2 text-white">
-                  {r.display_name ?? <span className="text-white/50">(未改名)</span>}
-                </td>
-                <td className="px-3 py-2 text-right text-white/70">{r.cleared_count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <div className="grid grid-cols-[80px_1fr_120px] border-b border-white/10 px-4 py-3 text-sm text-white/55">
+          <div>排名</div>
+          <div>玩家</div>
+          <div className="text-right">通關數</div>
+        </div>
 
-      <p className="text-xs text-white/55">提示：想上榜，就快啲通關啦～</p>
-    </div>
+        {loading ? (
+          <div className="px-4 py-6 text-sm text-white/60">讀緊資料…</div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-white/60">暫時未有資料。</div>
+        ) : (
+          rows.map((row, index) => (
+            <div
+              key={row.user_id}
+              className="grid grid-cols-[80px_1fr_120px] items-center border-b border-white/5 px-4 py-3 text-sm last:border-b-0"
+            >
+              <div className="font-medium text-white">{index + 1}</div>
+              <div className="text-white/85">{getDisplayName(row)}</div>
+              <div className="text-right font-semibold text-white">
+                {Number(row.cleared_count ?? 0)}
+              </div>
+            </div>
+          ))
+        )}
+      </section>
+    </main>
   );
 }

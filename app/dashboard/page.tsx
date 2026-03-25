@@ -7,12 +7,14 @@ import { supabase } from "../../lib/supabaseClient";
 
 type ProfileRow = { display_name: string | null };
 type StatsRow = { cleared_count: number | null };
+type RunRow = { cleared_count: number | null; duration_sec: number | null };
 type RunAgg = { total: number; wins: number; avg_sec: number };
 
 function pct(n: number) {
   if (!isFinite(n)) return "0%";
   return `${Math.round(n * 100)}%`;
 }
+
 function fmtSec(sec: number) {
   const s = Math.max(0, Math.floor(sec || 0));
   const mm = Math.floor(s / 60);
@@ -31,46 +33,68 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const winRate = useMemo(() => (agg.total > 0 ? agg.wins / agg.total : 0), [agg]);
+  const winRate = useMemo(
+    () => (agg.total > 0 ? agg.wins / agg.total : 0),
+    [agg]
+  );
 
   useEffect(() => {
-    (async () => {
+    async function loadDashboard() {
       setLoading(true);
       setErr("");
 
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
+      const client = supabase;
+
+      if (!client) {
+        setErr("Supabase 未初始化。");
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userErr,
+      } = await client.auth.getUser();
+
+      if (userErr) {
+        setErr(userErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
         router.push("/login");
         return;
       }
-      setEmail(u.user.email ?? "");
+
+      setEmail(user.email ?? "");
 
       // 1) Profile
-      const { data: prof, error: profErr } = await supabase
+      const { data: prof, error: profErr } = await client
         .from("profiles")
         .select("display_name")
-        .eq("id", u.user.id)
+        .eq("id", user.id)
         .maybeSingle<ProfileRow>();
 
       if (profErr) {
         setErr(profErr.message);
-      } else {
-        const dn = (prof?.display_name ?? "").trim();
-        setDisplayName(dn);
+        setLoading(false);
+        return;
+      }
 
-        if (!dn) {
-            router.push("/profile");   // ✅ 強制去改名
-            return;
-            }
-            }
+      const dn = (prof?.display_name ?? "").trim();
+      setDisplayName(dn);
 
-      
+      if (!dn) {
+        router.push("/profile");
+        return;
+      }
 
       // 2) Player stats（cleared_count）
-      const { data: st, error: stErr } = await supabase
+      const { data: st, error: stErr } = await client
         .from("player_stats")
         .select("cleared_count")
-        .eq("user_id", u.user.id)
+        .eq("user_id", user.id)
         .maybeSingle<StatsRow>();
 
       if (stErr) {
@@ -80,27 +104,31 @@ export default function DashboardPage() {
       }
 
       // 3) Runs（用最近 200 局做簡單統計）
-      const { data: runs, error: runErr } = await supabase
+      const { data: runs, error: runErr } = await client
         .from("runs")
         .select("cleared_count, duration_sec")
+        .eq("user_id", user.id)
         .order("ended_at", { ascending: false })
         .limit(200);
 
       if (runErr) {
         setErr(runErr.message);
       } else {
-        const list = (runs as any[]) ?? [];
+        const list = ((runs ?? []) as RunRow[]);
         const total = list.length;
-        const wins = list.filter((r) => (r.cleared_count ?? 0) > 0).length;
+        const wins = list.filter((r) => Number(r.cleared_count ?? 0) > 0).length;
         const avg =
           total > 0
             ? list.reduce((sum, r) => sum + Number(r.duration_sec ?? 0), 0) / total
             : 0;
+
         setAgg({ total, wins, avg_sec: avg });
       }
 
       setLoading(false);
-    })();
+    }
+
+    loadDashboard();
   }, [router]);
 
   return (
@@ -112,34 +140,34 @@ export default function DashboardPage() {
             <div className="text-sm text-white/70">
               {loading ? "讀緊資料…" : `你好，${displayName || "未改名玩家"} 👋`}
             </div>
-            <div className="text-xs text-white/55 mt-1">email：{email}</div>
+            <div className="mt-1 text-xs text-white/55">email：{email}</div>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => router.push("/game")}
-              className="rounded-xl bg-white px-4 py-2 font-medium text-slate-900 disabled:opacity-40 transition"
+              className="rounded-xl bg-white px-4 py-2 font-medium text-slate-900 transition disabled:opacity-40"
               disabled={loading}
             >
               開局
             </button>
             <button
               onClick={() => router.push("/leaderboard")}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 hover:bg-white/10 transition disabled:opacity-40"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 transition hover:bg-white/10 disabled:opacity-40"
               disabled={loading}
             >
               排行榜
             </button>
             <button
               onClick={() => router.push("/me/runs")}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 hover:bg-white/10 transition disabled:opacity-40"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 transition hover:bg-white/10 disabled:opacity-40"
               disabled={loading}
             >
               我嘅紀錄
             </button>
             <button
               onClick={() => router.push("/profile")}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 hover:bg-white/10 transition disabled:opacity-40"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 transition hover:bg-white/10 disabled:opacity-40"
               disabled={loading}
             >
               改名
@@ -157,8 +185,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="text-xs text-white/55">通關數</div>
-          <div className="text-3xl font-semibold text-white">{loading ? "—" : cleared}</div>
-          <div className="text-xs text-white/55 mt-1">（來自 player_stats）</div>
+          <div className="text-3xl font-semibold text-white">
+            {loading ? "—" : cleared}
+          </div>
+          <div className="mt-1 text-xs text-white/55">（來自 player_stats）</div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -166,7 +196,7 @@ export default function DashboardPage() {
           <div className="text-3xl font-semibold text-white">
             {loading ? "—" : pct(winRate)}
           </div>
-          <div className="text-xs text-white/55 mt-1">
+          <div className="mt-1 text-xs text-white/55">
             最近 {loading ? "—" : agg.total} 局（wins: {loading ? "—" : agg.wins}）
           </div>
         </div>
@@ -176,7 +206,7 @@ export default function DashboardPage() {
           <div className="text-3xl font-semibold text-white">
             {loading ? "—" : fmtSec(agg.avg_sec)}
           </div>
-          <div className="text-xs text-white/55 mt-1">（以最近局數估算）</div>
+          <div className="mt-1 text-xs text-white/55">（以最近局數估算）</div>
         </div>
       </div>
     </div>

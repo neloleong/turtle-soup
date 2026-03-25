@@ -1,81 +1,143 @@
 // /app/login/page.tsx
 "use client";
 
-import { useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function LoginPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.trim().length >= 6 && !loading;
+  const canSubmit = useMemo(() => {
+    return email.trim().length > 0 && password.length >= 6;
+  }, [email, password]);
 
-  const register = async () => {
-    setMsg("");
-    if (!canSubmit) return setMsg("先輸入 email + 密碼（最少 6 位）先啦。");
+  async function handleSignUp() {
+    if (!canSubmit) {
+      setMsg("先輸入 email + 密碼（最少 6 位）先啦。");
+      return;
+    }
+
+    const client = supabase;
+    if (!client) {
+      setMsg("Supabase 未初始化。");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+    setMsg("");
+
+    const { error } = await client.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
     setLoading(false);
-    if (error) return setMsg("註冊失敗： " + error.message);
+
+    if (error) {
+      setMsg("註冊失敗：" + error.message);
+      return;
+    }
+
     setMsg("✅ 註冊咗喇！如果要電郵確認就去收信；唔使確認就可以直接登入。");
-  };
+  }
 
-  const login = async () => {
-    setMsg("");
-    if (!canSubmit) return setMsg("先輸入 email + 密碼（最少 6 位）先啦。");
+  async function handleLogin() {
+    if (!canSubmit) {
+      setMsg("先輸入 email + 密碼（最少 6 位）先啦。");
+      return;
+    }
+
+    const client = supabase;
+    if (!client) {
+      setMsg("Supabase 未初始化。");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoading(false);
-    if (error) return setMsg("登入失敗： " + error.message);
+    setMsg("");
 
-    // ✅ 登入後去控制面版
+    const { error } = await client.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setMsg("登入失敗：" + error.message);
+      return;
+    }
+
+    setMsg("✅ 登入成功，跳轉中…");
     router.push("/dashboard");
     router.refresh();
-  };
+  }
 
   return (
-    <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-      <h1 className="text-2xl font-semibold text-white">登入</h1>
-      <p className="text-sm text-white/70">登入後先去控制面版，自己揀玩唔玩。</p>
+    <main className="mx-auto max-w-md px-4 py-10 text-white">
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
+        <div className="mb-6">
+          <p className="mb-2 text-sm text-cyan-300">Account</p>
+          <h1 className="text-3xl font-bold">登入 / 註冊</h1>
+          <p className="mt-2 text-sm text-white/65">
+            用 email 同密碼登入，admin / player 都共用同一入口。
+          </p>
+        </div>
 
-      <div className="space-y-2">
-        <input
-          className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-white outline-none focus:ring-4 focus:ring-white/10"
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-white outline-none focus:ring-4 focus:ring-white/10"
-          placeholder="password（最少 6 位）"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
+        <div className="space-y-5">
+          <div>
+            <label className="mb-2 block text-sm text-white/80">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-cyan-400/40"
+            />
+          </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={register}
-          disabled={!canSubmit}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-white/85 hover:bg-white/10 disabled:opacity-40 transition"
-        >
-          {loading ? "…" : "註冊"}
-        </button>
-        <button
-          onClick={login}
-          disabled={!canSubmit}
-          className="rounded-xl bg-white px-4 py-2 font-medium text-slate-900 disabled:opacity-40 transition"
-        >
-          {loading ? "…" : "登入"}
-        </button>
-      </div>
+          <div>
+            <label className="mb-2 block text-sm text-white/80">密碼</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="至少 6 位"
+              className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-cyan-400/40"
+            />
+          </div>
 
-      {msg ? <p className="text-sm text-white/70 whitespace-pre-wrap">{msg}</p> : null}
-    </div>
+          {msg ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/85">
+              {msg}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="rounded-2xl bg-cyan-400 px-6 py-3 font-medium text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "處理中…" : "登入"}
+            </button>
+
+            <button
+              onClick={handleSignUp}
+              disabled={loading}
+              className="rounded-2xl border border-white/15 px-6 py-3 text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              註冊
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

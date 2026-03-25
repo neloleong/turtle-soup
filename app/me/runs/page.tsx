@@ -27,19 +27,45 @@ export default function MyRunsPage() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return router.push("/login");
+    async function loadRuns() {
+      const client = supabase;
 
-      const { data: list, error } = await supabase
+      if (!client) {
+        setErr("Supabase 未初始化。");
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userErr,
+      } = await client.auth.getUser();
+
+      if (userErr) {
+        setErr(userErr.message);
+        return;
+      }
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: list, error } = await client
         .from("runs")
         .select("id, ended_at, cleared_count, duration_sec, mode, soup_id")
+        .eq("user_id", user.id)
         .order("ended_at", { ascending: false })
         .limit(50);
 
-      if (error) return setErr(error.message);
-      setRows((list as any) ?? []);
-    })();
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+
+      setRows((list as RunRow[]) ?? []);
+    }
+
+    loadRuns();
   }, [router]);
 
   return (
@@ -48,7 +74,7 @@ export default function MyRunsPage() {
         <h1 className="text-2xl font-semibold text-white">我嘅紀錄</h1>
         <button
           onClick={() => router.push("/game")}
-          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 hover:bg-white/10 transition"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/85 transition hover:bg-white/10"
         >
           返去開局
         </button>
@@ -60,17 +86,20 @@ export default function MyRunsPage() {
         <table className="w-full border-collapse">
           <thead className="bg-white/5">
             <tr className="text-left text-xs text-white/60">
-              <th className="px-3 py-2 w-20">ID</th>
-              <th className="px-3 py-2 w-56">完場時間</th>
-              <th className="px-3 py-2 w-24">結果</th>
-              <th className="px-3 py-2 text-right w-24">用時</th>
-              <th className="px-3 py-2 w-28">模式</th>
+              <th className="w-20 px-3 py-2">ID</th>
+              <th className="w-56 px-3 py-2">完場時間</th>
+              <th className="w-24 px-3 py-2">結果</th>
+              <th className="w-24 px-3 py-2 text-right">用時</th>
+              <th className="w-28 px-3 py-2">模式</th>
               <th className="px-3 py-2">題目ID</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5">
+              <tr
+                key={r.id}
+                className="border-t border-white/5 hover:bg-white/5"
+              >
                 <td className="px-3 py-2 text-white/70">{r.id}</td>
                 <td className="px-3 py-2 text-white/70">
                   {new Date(r.ended_at).toLocaleString()}
@@ -86,9 +115,13 @@ export default function MyRunsPage() {
                     {r.cleared_count > 0 ? "通關" : "未通關"}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right text-white/70">{fmtSec(r.duration_sec)}</td>
+                <td className="px-3 py-2 text-right text-white/70">
+                  {fmtSec(r.duration_sec)}
+                </td>
                 <td className="px-3 py-2 text-white/70">{r.mode}</td>
-                <td className="px-3 py-2 text-white/70">{r.soup_id ?? "(null)"}</td>
+                <td className="px-3 py-2 text-white/70">
+                  {r.soup_id ?? "(null)"}
+                </td>
               </tr>
             ))}
           </tbody>
