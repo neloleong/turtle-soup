@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
 type LeaderboardRow = {
@@ -19,8 +18,6 @@ type LeaderboardRow = {
 };
 
 export default function LeaderboardPage() {
-  const router = useRouter();
-
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -33,24 +30,8 @@ export default function LeaderboardPage() {
       const client = supabase;
 
       if (!client) {
-        setErr("Supabase 未初始化。");
+        setErr("資料庫連線未初始化。");
         setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-        error: userErr,
-      } = await client.auth.getUser();
-
-      if (userErr) {
-        setErr(userErr.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!user) {
-        router.push("/login");
         return;
       }
 
@@ -71,7 +52,7 @@ export default function LeaderboardPage() {
     }
 
     loadLeaderboard();
-  }, [router]);
+  }, []);
 
   function getDisplayName(row: LeaderboardRow) {
     if (!row.profiles) return "未命名玩家";
@@ -82,13 +63,14 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <main className="space-y-4">
+    <main className="mx-auto max-w-4xl px-4 py-8 text-white">
       <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
+            <p className="mb-2 text-sm text-cyan-300">Leaderboard</p>
             <h1 className="text-2xl font-semibold text-white">排行榜</h1>
             <p className="mt-1 text-sm text-white/65">
-              依通關數由高到低排列
+              依通關數由高到低排列的公開排行榜
             </p>
           </div>
         </div>
@@ -100,7 +82,7 @@ export default function LeaderboardPage() {
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <section className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
         <div className="grid grid-cols-[80px_1fr_120px] border-b border-white/10 px-4 py-3 text-sm text-white/55">
           <div>排名</div>
           <div>玩家</div>
@@ -108,7 +90,7 @@ export default function LeaderboardPage() {
         </div>
 
         {loading ? (
-          <div className="px-4 py-6 text-sm text-white/60">讀緊資料…</div>
+          <div className="px-4 py-6 text-sm text-white/60">讀取資料中…</div>
         ) : rows.length === 0 ? (
           <div className="px-4 py-6 text-sm text-white/60">暫時未有資料。</div>
         ) : (

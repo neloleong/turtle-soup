@@ -3,8 +3,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase/client";
 
 type Soup = {
   id: string;
@@ -31,15 +29,11 @@ function pickRandom<T>(arr: T[]): T | null {
   return arr[idx] ?? null;
 }
 
-export default function GameClient({ soup: initialSoup, mode: initialMode, allSoups }: Props) {
-  const router = useRouter();
-
-  const [userId, setUserId] = useState<string | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-
-  const [playedSet, setPlayedSet] = useState<Set<string>>(new Set());
-  const [loadingPlayed, setLoadingPlayed] = useState(true);
-
+export default function GameClient({
+  soup: initialSoup,
+  mode: initialMode,
+  allSoups,
+}: Props) {
   const [mode, setMode] = useState<"random" | "select">(initialMode);
   const [soup, setSoup] = useState<Soup>(initialSoup);
 
@@ -49,107 +43,44 @@ export default function GameClient({ soup: initialSoup, mode: initialMode, allSo
   const [wrongCount, setWrongCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
 
-  const winKeywords = useMemo(() => (soup.winKeywords ?? []).map((s) => s.toLowerCase()), [soup.winKeywords]);
-  const yesKeywords = useMemo(() => (soup.yesKeywords ?? []).map((s) => s.toLowerCase()), [soup.yesKeywords]);
-  const noKeywords = useMemo(() => (soup.noKeywords ?? []).map((s) => s.toLowerCase()), [soup.noKeywords]);
+  const winKeywords = useMemo(
+    () => (soup.winKeywords ?? []).map((s) => s.toLowerCase()),
+    [soup.winKeywords]
+  );
+  const yesKeywords = useMemo(
+    () => (soup.yesKeywords ?? []).map((s) => s.toLowerCase()),
+    [soup.yesKeywords]
+  );
+  const noKeywords = useMemo(
+    () => (soup.noKeywords ?? []).map((s) => s.toLowerCase()),
+    [soup.noKeywords]
+  );
 
-  // ✅ 必須登入：用 localStorage session（supabase-js）
   useEffect(() => {
-    let alive = true;
+    let currentSoup = initialSoup;
 
-    (async () => {
-      setCheckingAuth(true);
-
-      // 1) 先拿現有 session（最穩）
-      const { data: s1 } = await supabase.auth.getSession();
-      const uid1 = s1.session?.user?.id ?? null;
-      if (uid1) {
-        if (!alive) return;
-        setUserId(uid1);
-        setCheckingAuth(false);
-        return;
+    if (initialMode === "random") {
+      const picked = pickRandom(allSoups);
+      if (picked) {
+        currentSoup = picked;
+        setSoup(picked);
       }
-
-      // 2) 如果一開始未 ready，就等 auth state（避免誤踢）
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-        const uid = session?.user?.id ?? null;
-        if (!alive) return;
-
-        if (uid) {
-          setUserId(uid);
-          setCheckingAuth(false);
-        }
-      });
-
-      // 3) 兜底：1.2 秒後仍然冇就踢 login
-      setTimeout(async () => {
-        if (!alive) return;
-        const { data: s2 } = await supabase.auth.getSession();
-        const uid2 = s2.session?.user?.id ?? null;
-        if (uid2) {
-          setUserId(uid2);
-          setCheckingAuth(false);
-        } else {
-          router.replace("/login");
-        }
-        sub.subscription.unsubscribe();
-      }, 1200);
-    })();
-
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ✅ 讀已玩過（登入後）
-  useEffect(() => {
-    (async () => {
-      if (!userId) return;
-      setLoadingPlayed(true);
-
-      const { data, error } = await supabase
-        .from("runs")
-        .select("soup_id")
-        .eq("user_id", userId);
-
-      if (!error) {
-        setPlayedSet(new Set((data ?? []).map((r: any) => r.soup_id).filter(Boolean)));
-      }
-      setLoadingPlayed(false);
-    })();
-  }, [userId]);
-
-  // ✅ 挑題：做過唔再出現
-  useEffect(() => {
-    if (checkingAuth || loadingPlayed) return;
-
-    if (mode === "select" && playedSet.has(soup.id)) {
-      setMsgs([
-        { role: "host", text: "呢題已完成，唔會再出現。" },
-        { role: "host", text: "請返回選題揀其他未玩過嘅題目。" },
-      ]);
-      return;
     }
 
-    if (mode === "random") {
-      const unplayed = allSoups.filter((x) => !playedSet.has(x.id));
-      const picked = pickRandom(unplayed);
-      if (picked) setSoup(picked);
-    }
-
+    setMode(initialMode);
     setMsgs([
-      { role: "host", text: `【湯面】${soup.surface}` },
-      { role: "host", text: mode === "random" ? "模式：隨機（random）" : "模式：自選（select）" },
-      { role: "host", text: "你可以開始問問題（是/否問題）。" },
+      { role: "host", text: `【湯面】${currentSoup.surface}` },
+      {
+        role: "host",
+        text: initialMode === "random" ? "模式：隨機（random）" : "模式：自選（select）",
+      },
+      { role: "host", text: "你可以開始問問題（是 / 否問題）。" },
     ]);
-
     setStartAt(Date.now());
     setWrongCount(0);
     setIsFinished(false);
     setInput("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkingAuth, loadingPlayed]);
+  }, [initialSoup, initialMode, allSoups]);
 
   function isWinInput(q: string) {
     const t = q.toLowerCase();
@@ -158,53 +89,42 @@ export default function GameClient({ soup: initialSoup, mode: initialMode, allSo
 
   function hostReply(q: string): string {
     const t = q.toLowerCase();
+
     if (yesKeywords.some((k) => k && t.includes(k))) return "是。";
     if (noKeywords.some((k) => k && t.includes(k))) return "否。";
+
     setWrongCount((x) => x + 1);
-    return "不確定／無關。請用更具體的『是/否』問題。";
+    return "不確定／無關。請試用更具體的「是 / 否」問題。";
   }
 
-  async function finish(win: boolean) {
+  function finish(win: boolean) {
     if (isFinished) return;
-    if (!userId) return;
 
     setIsFinished(true);
+
     const durationSec = Math.max(1, Math.floor((Date.now() - startAt) / 1000));
-
-    const { error } = await supabase.rpc("finish_run", {
-      p_soup_id: soup.id,
-      p_win: win,
-      p_duration_sec: durationSec,
-      p_wrong_count: wrongCount,
-      p_mode: mode,
-    });
-
-    if (error) {
-      setMsgs((m) => [...m, { role: "host", text: `❌ 結算失敗：${error.message}` }]);
-      setIsFinished(false);
-      return;
-    }
-
-    setPlayedSet((prev) => new Set([...Array.from(prev), soup.id]));
 
     setMsgs((m) => [
       ...m,
       { role: "host", text: win ? "✅ 通關！" : "❌ 已結束" },
       { role: "host", text: `【湯底】${soup.solution}` },
+      {
+        role: "host",
+        text: `本局統計：耗時 ${durationSec} 秒，偏離 / 無關提問 ${wrongCount} 次。`,
+      },
     ]);
   }
 
-  async function submitQuestion() {
+  function submitQuestion() {
     const q = input.trim();
     if (!q || isFinished) return;
 
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setInput("");
 
-    // ✅ 命中 winKeywords → 自動通關（所以冇「我已猜到」按鈕）
     if (isWinInput(q)) {
       setMsgs((m) => [...m, { role: "host", text: "（命中關鍵）" }]);
-      await finish(true);
+      finish(true);
       return;
     }
 
@@ -212,75 +132,91 @@ export default function GameClient({ soup: initialSoup, mode: initialMode, allSo
     setMsgs((m) => [...m, { role: "host", text: reply }]);
   }
 
-  const unplayedCount = allSoups.filter((x) => !playedSet.has(x.id)).length;
+  function restartRandom() {
+    const picked = pickRandom(allSoups);
+    if (!picked) return;
 
-  // ✅ 靜默 loading，唔顯示任何「請登入」備註
-  if (checkingAuth) return null;
+    setMode("random");
+    setSoup(picked);
+    setMsgs([
+      { role: "host", text: `【湯面】${picked.surface}` },
+      { role: "host", text: "模式：隨機（random）" },
+      { role: "host", text: "你可以開始問問題（是 / 否問題）。" },
+    ]);
+    setStartAt(Date.now());
+    setWrongCount(0);
+    setIsFinished(false);
+    setInput("");
+  }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{soup.title}</h1>
-          <div className="text-sm opacity-70 mt-1">
-            ID: {soup.id} ｜ Mode: {mode} ｜ 未玩：{loadingPlayed ? "..." : unplayedCount}
+    <main className="mx-auto max-w-5xl px-4 py-8 text-white">
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-2 text-sm text-cyan-300">Game</p>
+            <h1 className="text-2xl font-bold">{soup.title}</h1>
+            <div className="mt-1 text-sm text-white/60">
+              ID: {soup.id} ｜ Mode: {mode}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              className="rounded-md border border-white/15 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10"
+              onClick={() => finish(false)}
+              disabled={isFinished}
+            >
+              放棄（結束）
+            </button>
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button className="rounded-md border px-3 py-2 hover:bg-black/5" onClick={() => finish(false)} disabled={isFinished}>
-            放棄（結束）
+        <div className="mt-6 min-h-[240px] space-y-2 rounded-lg border border-white/10 bg-black/20 p-4">
+          {msgs.map((m, idx) => (
+            <div key={idx} className={m.role === "user" ? "text-right" : "text-left"}>
+              <span
+                className={
+                  m.role === "user"
+                    ? "inline-block rounded-lg bg-white/10 px-3 py-2"
+                    : "inline-block rounded-lg bg-black/30 px-3 py-2"
+                }
+              >
+                {m.text}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <input
+            className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30"
+            placeholder="輸入問題（是 / 否問題）…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isFinished}
+          />
+          <button
+            className="rounded-md border border-white/15 px-4 py-2 text-white/85 transition hover:bg-white/10"
+            onClick={submitQuestion}
+            disabled={isFinished}
+          >
+            送出
           </button>
         </div>
-      </div>
 
-      <div className="mt-6 rounded-lg border p-4 space-y-2 min-h-[240px]">
-        {msgs.map((m, idx) => (
-          <div key={idx} className={m.role === "user" ? "text-right" : "text-left"}>
-            <span className={m.role === "user" ? "inline-block rounded-lg bg-black/5 px-3 py-2" : "inline-block rounded-lg bg-black/10 px-3 py-2"}>
-              {m.text}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 flex gap-2">
-        <input
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="輸入問題（是/否問題）…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={isFinished}
-        />
-        <button className="rounded-md border px-4 py-2 hover:bg-black/5" onClick={submitQuestion} disabled={isFinished}>
-          送出
-        </button>
-      </div>
-
-      <div className="mt-6 flex gap-4 text-sm">
-        <Link className="underline" href="/soups">去選題（只顯示未玩過）</Link>
-        <button
-          className="underline"
-          onClick={() => {
-            const unplayed = allSoups.filter((x) => !playedSet.has(x.id));
-            const picked = pickRandom(unplayed);
-            if (!picked) return;
-            setMode("random");
-            setSoup(picked);
-            setMsgs([
-              { role: "host", text: `【湯面】${picked.surface}` },
-              { role: "host", text: "模式：隨機（random）" },
-              { role: "host", text: "你可以開始問問題（是/否問題）。" },
-            ]);
-            setStartAt(Date.now());
-            setWrongCount(0);
-            setIsFinished(false);
-            setInput("");
-          }}
-        >
-          再玩一局（random）
-        </button>
-      </div>
-    </div>
+        <div className="mt-6 flex flex-wrap gap-4 text-sm text-white/80">
+          <Link className="underline" href="/soups">
+            去選題
+          </Link>
+          <button className="underline" onClick={restartRandom}>
+            再玩一局（random）
+          </button>
+          <Link className="underline" href="/start">
+            返回開始頁
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
