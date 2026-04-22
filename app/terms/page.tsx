@@ -1,86 +1,90 @@
-// /app/privacy/page.tsx
+// /app/terms/page.tsx
 import Link from "next/link";
 
-export default function PrivacyPage() {
+export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
-      <h1 className="text-3xl font-semibold text-white">私隱政策</h1>
+    <main className="mx-auto max-w-3xl px-4 py-8 text-white">
+      <section className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <p className="text-sm text-cyan-300">Terms of Use</p>
+        <h1 className="text-3xl font-semibold text-white">使用條款</h1>
 
-      <p className="text-white/75 leading-relaxed">
-        我哋重視你嘅私隱。本網站提供《海龜湯》文字推理遊戲、排行榜同玩家紀錄等功能。以下說明我哋會收集咩資料、點樣使用、同你有咩選擇。
-      </p>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">1）我哋收集咩資料？</h2>
-        <ul className="list-disc pl-6 text-white/75 space-y-1 leading-relaxed">
-          <li>
-            <strong className="text-white/90">帳戶登入資料</strong>：你用電郵註冊/登入（由 Supabase Auth
-            處理）。
-          </li>
-          <li>
-            <strong className="text-white/90">暱稱</strong>：用於排行榜展示（只顯示暱稱，不會公開你嘅電郵）。
-          </li>
-          <li>
-            <strong className="text-white/90">遊戲紀錄</strong>：通關/未通關、用時、題目 ID、模式等，用作保存你嘅紀錄同統計排行榜。
-          </li>
-          <li>
-            <strong className="text-white/90">技術性資料</strong>：例如裝置/瀏覽器資訊、cookie（用於登入狀態維持與基本功能；部分第三方服務亦可能使用）。
-          </li>
-        </ul>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">2）我哋點樣用你嘅資料？</h2>
-        <ul className="list-disc pl-6 text-white/75 space-y-1 leading-relaxed">
-          <li>提供登入、保存遊戲紀錄、顯示排行榜。</li>
-          <li>改善體驗（例如分析題目表現、統計整體使用情況）。</li>
-          <li>維護安全（例如防止濫用、維護系統穩定）。</li>
-        </ul>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">3）第三方服務</h2>
-        <p className="text-white/75 leading-relaxed">
-          本網站可能使用第三方服務（例如 Supabase、Google 相關服務）以提供登入、分析、驗證或廣告功能。第三方可能按照其政策處理資料（例如 cookie、裝置資訊等）。
+        <p className="leading-relaxed text-white/75">
+          歡迎使用本網站。本網站提供海龜湯文字推理遊戲、玩法教學、公開題目列表及相關資訊內容。
+          當你瀏覽或使用本網站，即表示你同意遵守以下使用條款。如你不同意本條款，請停止使用本網站。
         </p>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">1）網站用途</h2>
+          <p className="leading-relaxed text-white/75">
+            本網站主要提供海龜湯推理遊戲及相關公開內容，供一般瀏覽、娛樂及參考用途。
+            我們可按實際需要調整網站內容、功能、版面、可用題目或服務範圍，而不作另行通知。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">2）可接受使用方式</h2>
+          <p className="leading-relaxed text-white/75">
+            你同意以合法及合理方式使用本網站，不得利用本網站從事任何干擾系統、
+            濫用服務、破壞網站正常運作、未經授權擷取資料、散播惡意程式、
+            自動化大量請求、或其他不當用途。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">3）內容與知識產權</h2>
+          <p className="leading-relaxed text-white/75">
+            本網站上的題目、文字內容、設計、版面及相關材料，除另有註明外，均由本網站或相關權利人擁有。
+            未經授權，不得擅自大量複製、轉載、重新發佈、出售或作商業用途。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">4）網站內容準確性</h2>
+          <p className="leading-relaxed text-white/75">
+            我們會盡力保持網站內容完整及可用，但不保證所有資料、題目、說明或功能必然持續正確、
+            完整、無錯誤或不中斷。網站內容按現況提供，你應自行判斷是否適合使用。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">5）第三方服務</h2>
+          <p className="leading-relaxed text-white/75">
+            本網站可能使用第三方服務以支援網站運作、資料處理、分析或廣告功能。
+            使用本網站時，相關第三方服務亦可能按其本身條款及政策運作。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">6）責任限制</h2>
+          <p className="leading-relaxed text-white/75">
+            在法律允許的最大範圍內，本網站不就因使用、無法使用、
+            網站中斷、資料遺失、內容錯誤、或其他相關情況引致的直接或間接損失承擔責任。
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-white">7）條款更新</h2>
+          <p className="leading-relaxed text-white/75">
+            我們可按需要不時修改本使用條款。更新版本將刊載於本頁，
+            並自刊載時起生效。你繼續使用本網站，即視為接受更新後的條款。
+          </p>
+        </section>
+
+        <div className="pt-2 text-sm text-white/70">
+          聯絡：<span className="font-mono">mtscardshop@gmail.com</span>
+        </div>
+
+        <div className="flex gap-3 pt-2 text-sm">
+          <Link className="text-white/70 underline hover:text-white" href="/privacy">
+            私隱政策
+          </Link>
+          <Link className="text-white/70 underline hover:text-white" href="/">
+            返回首頁
+          </Link>
+        </div>
+
+        <div className="text-xs text-white/45">最後更新：2026-04-22</div>
       </section>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">4）Cookie 與追蹤</h2>
-        <p className="text-white/75 leading-relaxed">
-          為了登入狀態維持與基本功能，本網站可能使用 cookie 或相似技術。你可以透過瀏覽器設定管理/刪除 cookie。若網站啟用廣告服務，廣告供應商亦可能使用 cookie 以提供/量度廣告。
-        </p>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">5）資料保存與刪除</h2>
-        <p className="text-white/75 leading-relaxed">
-          我哋只會喺提供服務所需期間保存資料。如你希望查詢、更新或刪除帳戶資料，可透過下方聯絡方式提出。
-        </p>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">6）政策更新</h2>
-        <p className="text-white/75 leading-relaxed">
-          本政策可能不定期更新。更新後會於本頁公布並以最新版本為準。
-        </p>
-      </section>
-
-      <div className="pt-2 text-sm text-white/70">
-        聯絡：<span className="font-mono">support@turtle-soup-mu.vercel.app</span>{" "}
-        （你之後可換成真 email）
-      </div>
-
-      <div className="flex gap-3 pt-2 text-sm">
-        <Link className="text-white/70 hover:text-white underline" href="/terms">
-          使用條款
-        </Link>
-        <Link className="text-white/70 hover:text-white underline" href="/">
-          返回首頁
-        </Link>
-      </div>
-
-      <div className="text-xs text-white/45">最後更新：2026-03-03</div>
-    </div>
+    </main>
   );
 }
